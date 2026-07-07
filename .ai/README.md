@@ -57,6 +57,16 @@ same `Session` / `Transport` seam.
   `list(path)→AsyncIterable<string>`, `delete(path,{recursive?})`.
 - **objects** — `probe(id)`, `contains(id)→boolean`, `getType(id)→string`,
   `find(id)→AsyncIterable<Identity>`.
+- **user** — swarm membership: `newNodeContract(alias)`, `acceptMembership(contract, issuerSig)`, `expel(nodeID)`.
+- **auth** — permission contracts: `signContract(contract)`, `index(objectID)`.
+- **services** — `discover(follow?)→AsyncIterable` of `services.update`.
+
+Method names mirror the op strings (camelCase of the op's operation segment):
+`user.new_node_contract`→`newNodeContract`, `auth.index`→`index`, etc. The three
+above (user/auth/services) pass complex signed objects — `Contract`,
+`Signature`, `SignedExpulsion`, `services.update` — through as `AstralObject`
+(no `Permit`/`Bundle` schema). They need **live-node confirmation** of the
+signing/exchange choreography before being treated as frozen.
 
 ## Deferred / caveats
 

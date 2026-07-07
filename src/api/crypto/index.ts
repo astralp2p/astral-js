@@ -23,6 +23,7 @@
  */
 
 import type { Host } from '../../apphost/host.js';
+import { Ops } from './consts.js';
 import { RemoteError } from '../../astral/errors.js';
 
 /** Options for {@link Crypto.publicKey}. */
@@ -80,7 +81,7 @@ export class Crypto {
    * @returns The public key as `<scheme>:<hex>`.
    */
   async publicKey(opts: PublicKeyOptions = {}): Promise<string> {
-    const value = await this.host.callOne('crypto.public_key', {
+    const value = await this.host.callOne(Ops.publicKey, {
       args: { scheme: opts.scheme },
     });
     return value as string;
@@ -101,7 +102,7 @@ export class Crypto {
    * @returns The signature as `<scheme>:<base64>`.
    */
   async signText(text: string, opts: SignTextOptions = {}): Promise<string> {
-    const value = await this.host.callOne('crypto.sign_text', {
+    const value = await this.host.callOne(Ops.signText, {
       args: { text, key: opts.key, scheme: opts.scheme },
     });
     return value as string;
@@ -131,7 +132,7 @@ export class Crypto {
    */
   async verifyTextSignature(text: string, sig: string, key: string): Promise<boolean> {
     try {
-      await this.host.callOne('crypto.verify_text_signature', {
+      await this.host.callOne(Ops.verifyTextSignature, {
         args: { text, sig, key },
       });
       return true;

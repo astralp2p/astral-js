@@ -41,6 +41,7 @@
  */
 
 import type { Host } from '../../apphost/host.js';
+import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
 import { isError } from '../../astral/object.js';
 import type { Identity } from '../../astral/identity.js';
@@ -87,7 +88,7 @@ export class Objects {
    * @returns The descriptor {@link AstralObject}.
    */
   async probe(id: ObjectID | string): Promise<AstralObject> {
-    const objs = await this.host.call('objects.probe', { args: { id } });
+    const objs = await this.host.call(Ops.probe, { args: { id } });
     if (objs.length === 0) {
       throw new ProtocolError('objects.probe returned no descriptor');
     }
@@ -112,7 +113,7 @@ export class Objects {
    * @returns `true` if the node holds the object, `false` otherwise.
    */
   async contains(id: ObjectID | string): Promise<boolean> {
-    const value = await this.host.callOne('objects.contains', { args: { id } });
+    const value = await this.host.callOne(Ops.contains, { args: { id } });
     return Boolean(value);
   }
 
@@ -129,7 +130,7 @@ export class Objects {
    * @returns The object's type string, or `''` when the node returns none.
    */
   async getType(id: ObjectID | string): Promise<string> {
-    const value = await this.host.callOne('objects.get_type', { args: { id } });
+    const value = await this.host.callOne(Ops.getType, { args: { id } });
     return value == null ? '' : (value as string);
   }
 
@@ -153,7 +154,7 @@ export class Objects {
    * @returns An async iterable of holder {@link Identity} values.
    */
   async find(id: ObjectID | string): Promise<AsyncIterable<Identity>> {
-    const stream = await this.host.query('objects.find', { args: { id } });
+    const stream = await this.host.query(Ops.find, { args: { id } });
     return {
       async *[Symbol.asyncIterator](): AsyncGenerator<Identity, void, undefined> {
         try {

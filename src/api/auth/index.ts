@@ -43,6 +43,7 @@
  */
 
 import type { Host } from '../../apphost/host.js';
+import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
 import { eos, isError, isAck } from '../../astral/object.js';
 import type { ObjectID } from '../../astral/objectid.js';
@@ -123,7 +124,7 @@ export class Auth {
    * @returns The signed contract object (type `mod.auth.signed_contract`).
    */
   async signContract(contract: Contract): Promise<SignedContract> {
-    const stream = await this.host.query('auth.sign_contract');
+    const stream = await this.host.query(Ops.signContract);
     try {
       stream.send(contract);
       stream.send(eos());
@@ -160,7 +161,7 @@ export class Auth {
    */
   async index(objectID: ObjectID | string): Promise<void> {
     const id = parseObjectID(objectID);
-    const stream = await this.host.query('auth.index', { args: { id } });
+    const stream = await this.host.query(Ops.index, { args: { id } });
     try {
       for await (const o of stream) {
         if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');

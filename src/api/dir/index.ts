@@ -27,6 +27,7 @@
  */
 
 import type { Host } from '../../apphost/host.js';
+import { Ops } from './consts.js';
 import type { Identity } from '../../astral/identity.js';
 import { parseIdentity } from '../../astral/identity.js';
 
@@ -64,7 +65,7 @@ export class Dir {
    * @returns The resolved node identity.
    */
   async resolve(name: string): Promise<Identity> {
-    const value = await this.host.callOne('dir.resolve', { args: { name } });
+    const value = await this.host.callOne(Ops.resolve, { args: { name } });
     return parseIdentity(value as string);
   }
 
@@ -81,7 +82,7 @@ export class Dir {
    * @returns The alias string, or `''` when the identity has no alias.
    */
   async getAlias(id: Identity | string): Promise<string> {
-    const value = await this.host.callOne('dir.get_alias', { args: { id } });
+    const value = await this.host.callOne(Ops.getAlias, { args: { id } });
     return value == null ? '' : (value as string);
   }
 
@@ -98,6 +99,6 @@ export class Dir {
    * @param alias The alias to set; omit or pass `''` to clear it. Defaults to `''`.
    */
   async setAlias(id: Identity | string, alias = ''): Promise<void> {
-    await this.host.call('dir.set_alias', { args: { id, alias } });
+    await this.host.call(Ops.setAlias, { args: { id, alias } });
   }
 }

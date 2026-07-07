@@ -39,6 +39,7 @@
  */
 
 import type { Host } from '../../apphost/host.js';
+import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
 import { eos, isError } from '../../astral/object.js';
 import type { Identity } from '../../astral/identity.js';
@@ -117,7 +118,7 @@ export class User {
    * @returns The unsigned `mod.auth.contract` {@link AstralObject}.
    */
   async newNodeContract(alias: string): Promise<Contract> {
-    const objs = await this.host.call('user.new_node_contract', { args: { user: alias } });
+    const objs = await this.host.call(Ops.newNodeContract, { args: { user: alias } });
     if (objs.length === 0) {
       throw new ProtocolError('user.new_node_contract returned no contract');
     }
@@ -156,7 +157,7 @@ export class User {
    * @returns The node's subject `mod.crypto.signature` {@link AstralObject}.
    */
   async acceptMembership(contract: Contract, issuerSig: Signature): Promise<Signature> {
-    const stream = await this.host.query('user.accept_membership');
+    const stream = await this.host.query(Ops.acceptMembership);
     try {
       // Both inputs stream as objects, contract first then the issuer signature,
       // matching the server's two sequential Expect reads; eos ends the input.
@@ -202,7 +203,7 @@ export class User {
    * @returns The `mod.user.signed_expulsion` {@link AstralObject}.
    */
   async expel(nodeID: Identity | string): Promise<SignedExpulsion> {
-    const objs = await this.host.call('user.expel', { args: { target: nodeID } });
+    const objs = await this.host.call(Ops.expel, { args: { target: nodeID } });
     if (objs.length === 0) {
       throw new ProtocolError('user.expel returned no signed expulsion');
     }

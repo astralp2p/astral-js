@@ -35,15 +35,13 @@
  */
 
 import type { Host } from '../../apphost/host.js';
+import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
 import { isError } from '../../astral/object.js';
 import { RemoteError, readErrorMessage } from '../../astral/errors.js';
 
-/** The op string for {@link Services.discover}. Verbatim `MethodDiscover`. */
-const OP_DISCOVER = 'services.discover';
 
-/** The wire type tag of a service-availability update. Verbatim Go `Update.ObjectType()`. */
-export const UPDATE_TYPE = 'services.update';
+export { UPDATE_TYPE } from './consts.js';
 
 /**
  * The JSON `value` of a `services.update` {@link AstralObject}, as the node
@@ -146,7 +144,7 @@ export class Services {
    * @returns An async iterable of `services.update` {@link AstralObject}s.
    */
   async discover(follow = false): Promise<AsyncIterable<AstralObject>> {
-    const stream = await this.host.query(OP_DISCOVER, {
+    const stream = await this.host.query(Ops.discover, {
       args: { follow: follow ? true : undefined },
     });
 

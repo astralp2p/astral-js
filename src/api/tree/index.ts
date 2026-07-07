@@ -36,6 +36,7 @@
  */
 
 import type { Host } from '../../apphost/host.js';
+import { Ops } from './consts.js';
 import type { Stream } from '../../apphost/stream.js';
 import type { AstralObject } from '../../astral/object.js';
 import { eos, isError, isAck } from '../../astral/object.js';
@@ -104,7 +105,7 @@ export class Tree {
    */
   async get(path: string, opts: GetOptions = {}): Promise<AstralObject | Stream> {
     const follow = opts.follow ?? false;
-    const stream = await this.host.query('tree.get', {
+    const stream = await this.host.query(Ops.get, {
       args: { path, follow: follow ? true : undefined },
     });
 
@@ -141,7 +142,7 @@ export class Tree {
    * @param value The typed object to store at `path`.
    */
   async set(path: string, value: AstralObject): Promise<void> {
-    const stream = await this.host.query('tree.set', { args: { path } });
+    const stream = await this.host.query(Ops.set, { args: { path } });
     try {
       stream.send(value);
       stream.send(eos());
@@ -172,7 +173,7 @@ export class Tree {
    * @returns An async iterable of child name strings.
    */
   async list(path: string): Promise<AsyncIterable<string>> {
-    const stream = await this.host.query('tree.list', { args: { path } });
+    const stream = await this.host.query(Ops.list, { args: { path } });
     return {
       async *[Symbol.asyncIterator](): AsyncGenerator<string, void, undefined> {
         try {
@@ -202,7 +203,7 @@ export class Tree {
    */
   async delete(path: string, opts: DeleteOptions = {}): Promise<void> {
     const recursive = opts.recursive ?? false;
-    await this.host.call('tree.delete', {
+    await this.host.call(Ops.delete, {
       args: { path, recursive: recursive ? true : undefined },
     });
   }

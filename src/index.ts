@@ -25,5 +25,5 @@ export * from './astral/index.js';
 // The apphost WebSocket client so `import { connect } from 'astral-js'` resolves.
 // Errors (ConnectError, QueryRejected, RouteNotFound, …) are already re-exported
 // via the astral re-export above.
-export { connect, Host, Stream } from './apphost/index.js';
+export { connect, Host, Stream, Registration, IncomingQuery } from './apphost/index.js';
 export type { QueryOptions } from './apphost/index.js';

@@ -17,7 +17,7 @@
  */
 
 import type { AstralObject } from '../astral/object.js';
-import { obj } from '../astral/object.js';
+import { obj, isAck } from '../astral/object.js';
 import type { Identity } from '../astral/identity.js';
 import type { Zone } from '../astral/zone.js';
 import { ZoneDefault } from '../astral/zone.js';
@@ -25,11 +25,13 @@ import type { QueryArgs } from '../astral/encoding.js';
 import { buildQueryString } from '../astral/encoding.js';
 import { newNonce } from '../astral/nonce.js';
 import { ConnectError, ProtocolError, QueryRejected, queryErrorForCode } from '../astral/errors.js';
-import type { ErrorMsg, QueryRejectedMsg, RouteQueryMsg } from './messages.js';
+import type { ErrorMsg, QueryRejectedMsg, RouteQueryMsg, RegisterServiceMsg } from './messages.js';
 import { MessageTypes } from './messages.js';
 import type { Session, Transport } from './session.js';
 import { JsonWsTransport } from './session.js';
 import { Stream } from './stream.js';
+import type { IncomingQuery } from './serve.js';
+import { Registration } from './serve.js';
 
 /** Options for a single {@link Host.query}. Every field is optional. */
 export interface QueryOptions {
@@ -132,6 +134,50 @@ export class Host {
         session.close();
         throw new ProtocolError(`unexpected response to route_query: ${resp.type}`);
     }
+  }
+
+  /**
+   * Register this host as the handler for inbound queries to `identity` and
+   * return a live {@link Registration}.
+   *
+   * Opens a fresh authenticated {@link Session}, sends a `register_service_msg`,
+   * and gates on the reply: an `ack` starts the {@link Registration}'s delivery
+   * loop; a `null` (socket closed) raises {@link ConnectError}; an `error_msg`
+   * closes the session and raises {@link ProtocolError} carrying its `Code`; any
+   * other reply closes the session and raises {@link ProtocolError}. Faithful to
+   * the reference client's `Host.register`, retargeted onto the Phase-1
+   * {@link Session}/{@link Transport} seam.
+   *
+   * The handler is called once per inbound query with an {@link IncomingQuery};
+   * it must `accept()` (returning a responder {@link Stream}) or `reject()`
+   * (with a numeric code) — a throw is caught and turned into a `reject(0xff)`.
+   */
+  async register(
+    identity: Identity | string,
+    handler: (q: IncomingQuery) => void | Promise<void>,
+  ): Promise<Registration> {
+    const session = await this.transport.open();
+
+    const registerService: RegisterServiceMsg = { Identity: identity as Identity };
+    session.send(obj(MessageTypes.RegisterService, registerService));
+
+    const resp: AstralObject | null = await session.recv();
+    if (resp === null) {
+      session.close();
+      throw new ConnectError('socket closed before register ack');
+    }
+    if (resp.type === MessageTypes.Error) {
+      session.close();
+      throw new ProtocolError(`register failed: ${(resp.value as ErrorMsg).Code}`);
+    }
+    if (!isAck(resp)) {
+      session.close();
+      throw new ProtocolError(`expected ack, got ${resp.type}`);
+    }
+
+    const reg = new Registration(this.transport, session, handler);
+    reg.start();
+    return reg;
   }
 }
 

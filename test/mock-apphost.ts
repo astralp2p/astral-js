@@ -35,6 +35,11 @@ const ERROR = 'mod.apphost.error_msg';
 const ROUTE_QUERY = 'mod.apphost.route_query_msg';
 const QUERY_ACCEPTED = 'mod.apphost.query_accepted_msg';
 const QUERY_REJECTED = 'mod.apphost.query_rejected_msg';
+const REGISTER_SERVICE = 'mod.apphost.register_service_msg';
+const INCOMING_QUERY = 'mod.apphost.incoming_query_msg';
+const ATTACH_QUERY = 'mod.apphost.attach_query_msg';
+const REJECT_INCOMING = 'mod.apphost.reject_incoming_msg';
+const ACK = 'ack';
 const EOS = 'eos';
 
 /** A default host identity: a fixed, valid 66-hex string. */
@@ -66,6 +71,21 @@ export interface MockRoute {
   error?: string;
 }
 
+/**
+ * A scripted `incoming_query_msg` the mock pushes to a registration socket right
+ * after acking its `register_service_msg`. `Caller` / `Target` default to `null`.
+ */
+export interface MockIncomingQuery {
+  /** The query's id — also the attach pairing token. */
+  QueryID: string;
+  /** The caller identity, or `null`. */
+  Caller?: string | null;
+  /** The target identity, or `null`. */
+  Target?: string | null;
+  /** The full query string. */
+  Query: string;
+}
+
 /** Options controlling the mock apphost's behaviour. */
 export interface MockApphostOptions {
   /** The host identity announced in `host_info_msg`. Defaults to {@link DEFAULT_HOST_IDENTITY}; pass `null` for the unset case. */
@@ -83,6 +103,17 @@ export interface MockApphostOptions {
    * An unlisted query is answered with `error_msg` `{ Code: 'route_not_found' }`.
    */
   routes?: Record<string, MockRoute>;
+  /**
+   * Inbound queries the mock pushes to a registration socket right after acking
+   * its `register_service_msg`. One or many; omit for a bare registration.
+   */
+  incoming?: MockIncomingQuery | MockIncomingQuery[];
+}
+
+/** A single object captured on an attached per-query socket. */
+export interface CapturedObject {
+  type: string;
+  value: unknown;
 }
 
 /** A running mock apphost server. */
@@ -96,6 +127,23 @@ export interface MockApphost {
    * queries opens N+1 sockets, so tests can assert fresh-socket-per-op.
    */
   readonly connections: number;
+  /**
+   * The objects captured on each attached per-query socket, keyed by `QueryID`.
+   * A key appears once the client's `attach_query_msg` is acked; each object the
+   * client then sends is appended until (and excluding) its `eos`.
+   */
+  readonly accepted: Map<string, CapturedObject[]>;
+  /**
+   * The reject codes recorded from `reject_incoming_msg`s on registration
+   * sockets, keyed by `QueryID`.
+   */
+  readonly rejected: Map<string, number>;
+  /**
+   * Poll `predicate` until it returns truthy or `timeoutMs` elapses. Resolves on
+   * success, rejects on timeout. Lets tests await a captured/rejected result
+   * without racing the mock's async pushes.
+   */
+  waitFor(predicate: () => boolean, timeoutMs?: number): Promise<void>;
   /** Stop the server, closing any open sockets. Resolves once fully closed. */
   close(): Promise<void>;
 }
@@ -119,6 +167,18 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
   const goodToken = options.goodToken ?? DEFAULT_GOOD_TOKEN;
   const closeBeforeHostInfo = options.closeBeforeHostInfo ?? false;
   const routes = options.routes ?? {};
+  const incoming =
+    options.incoming === undefined
+      ? []
+      : Array.isArray(options.incoming)
+        ? options.incoming
+        : [options.incoming];
+
+  // Serve-path capture. `accepted` maps a QueryID to the objects the client sent
+  // on the socket that attached to it (until eos); `rejected` maps a QueryID to
+  // the code from a reject_incoming_msg on a registration socket.
+  const accepted = new Map<string, CapturedObject[]>();
+  const rejected = new Map<string, number>();
 
   // Count every accepted connection. A connect() handshake plus N queries opens
   // N+1 sockets; the returned MockApphost exposes this via a `connections` getter.
@@ -144,6 +204,10 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
     // Greet immediately with host_info_msg; the auth reply (if any) follows in
     // its own frame once a token arrives.
     ws.send(envelope(HOST_INFO, { Identity: hostIdentity, Alias: hostAlias }));
+
+    // Once this socket attaches to a query, it becomes a capture socket: every
+    // object it then sends is appended to accepted.get(attachedQueryID) until eos.
+    let attachedQueryID: string | null = null;
 
     ws.on('message', (data: unknown, isBinary: boolean) => {
       if (isBinary) return; // JSON mode: ignore binary frames.
@@ -188,6 +252,56 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
         ws.send(envelope(EOS, null));
         return;
       }
+
+      if (env.Type === REGISTER_SERVICE) {
+        // Ack the registration, then push each scripted inbound query onto this
+        // (registration) socket. Reserve each QueryID's capture list up front so
+        // waitFor(() => accepted.has(id)) only trips once a real attach lands.
+        ws.send(envelope(ACK, null));
+        for (const q of incoming) {
+          ws.send(
+            envelope(INCOMING_QUERY, {
+              QueryID: q.QueryID,
+              Caller: q.Caller ?? null,
+              Target: q.Target ?? null,
+              Query: q.Query,
+            }),
+          );
+        }
+        return;
+      }
+
+      if (env.Type === ATTACH_QUERY) {
+        // A fresh per-query socket attaching to an announced query: ack it, then
+        // capture every object it sends until eos into accepted.get(QueryID).
+        const queryID = (env.Object as { QueryID?: unknown } | null)?.QueryID;
+        if (typeof queryID === 'string') {
+          attachedQueryID = queryID;
+          if (!accepted.has(queryID)) accepted.set(queryID, []);
+          ws.send(envelope(ACK, null));
+        }
+        return;
+      }
+
+      if (env.Type === REJECT_INCOMING) {
+        // A reject_incoming_msg on a registration socket: record the code.
+        const payload = env.Object as { QueryID?: unknown; Code?: unknown } | null;
+        if (typeof payload?.QueryID === 'string' && typeof payload.Code === 'number') {
+          rejected.set(payload.QueryID, payload.Code);
+        }
+        return;
+      }
+
+      // Anything else on an attached per-query socket is a responder object:
+      // append it to the capture list until the responder's eos arrives.
+      if (attachedQueryID !== null) {
+        if (env.Type === EOS) {
+          attachedQueryID = null;
+          return;
+        }
+        const list = accepted.get(attachedQueryID);
+        if (list) list.push({ type: env.Type, value: env.Object ?? null });
+      }
     });
   });
 
@@ -204,6 +318,25 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
         get connections() {
           return connections;
         },
+        // Live references so tests observe the mock's async captures.
+        accepted,
+        rejected,
+        waitFor: (predicate: () => boolean, timeoutMs = 1000) =>
+          new Promise<void>((res, rej) => {
+            const deadline = Date.now() + timeoutMs;
+            const tick = (): void => {
+              if (predicate()) {
+                res();
+                return;
+              }
+              if (Date.now() >= deadline) {
+                rej(new Error('waitFor: predicate not satisfied before timeout'));
+                return;
+              }
+              setTimeout(tick, 5);
+            };
+            tick();
+          }),
         close: () =>
           new Promise<void>((res, rej) => {
             for (const client of wss.clients) client.terminate();

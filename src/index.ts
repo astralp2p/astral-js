@@ -5,25 +5,30 @@
  * `astral.json.v1` protocol. Authored in TypeScript, consumed from plain
  * JavaScript (bundled `.d.ts`, dual ESM/CJS).
  *
- * Layout (mirrors astral-go):
- *   astral/    wire primitives   — import from 'astral-js/astral'
- *   apphost/   the WebSocket client (connect/Host/Stream) — bundled into this root entry (PR: apphost-*)
- *   api/<p>/   protocol clients   — 'astral-js/api/{dir,crypto,tree,objects}' (PR: api-*)
+ * Three layers, each on its own import path (mirrors astral-go's
+ * `astral` / `lib/apphost` / `api/<p>` split):
  *
- * A full IPC transport (Node unix/tcp + binary) is a future milestone; this
- * build is WebSocket + JSON only.
+ *   astral-js/astral       wire primitives (Object, Identity, Zone, errors, …)
+ *   astral-js/apphost      the apphost WebSocket client lib (connect, Host, Stream, register)
+ *   astral-js/api/<p>      protocol clients ('astral-js/api/{dir,crypto,tree,objects}')
+ *
+ * This root is a thin convenience entry: `connect` plus the primitives. For the
+ * full apphost surface (Host, Stream, Registration, IncomingQuery, the
+ * transports and message types) import from `astral-js/apphost`; for a protocol
+ * client import from its `astral-js/api/<p>` path.
+ *
+ * A native IPC transport (Node unix/tcp + binary) is a future addition behind
+ * the same transport seam; this build is WebSocket + JSON only.
  */
 
 /** The package version. */
 export const version = '0.1.0';
 
-// astral-core primitives are re-exported here so `import { obj, buildQueryString }
-// from 'astral-js'` works. The apphost client surface (connect, Host, Stream,
-// errors) is added at this root in the apphost phase.
+// The wire primitives (and the error hierarchy) — so `import { obj, ObjectID,
+// ConnectError } from 'astral-js'` works. Full set: `astral-js/astral`.
 export * from './astral/index.js';
 
-// The apphost WebSocket client so `import { connect } from 'astral-js'` resolves.
-// Errors (ConnectError, QueryRejected, RouteNotFound, …) are already re-exported
-// via the astral re-export above.
-export { connect, Host, Stream, Registration, IncomingQuery } from './apphost/index.js';
-export type { QueryOptions } from './apphost/index.js';
+// The entry point of the apphost client. The rest of the apphost lib (Host,
+// Stream, Registration, IncomingQuery, transports, message types) lives at
+// `astral-js/apphost`.
+export { connect } from './apphost/index.js';

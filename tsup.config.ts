@@ -9,6 +9,7 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     'astral/index': 'src/astral/index.ts',
+    'apphost/index': 'src/apphost/index.ts',
     'api/dir/index': 'src/api/dir/index.ts',
     'api/crypto/index': 'src/api/crypto/index.ts',
     'api/tree/index': 'src/api/tree/index.ts',

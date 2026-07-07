@@ -23,6 +23,10 @@
       "import": { "types": "./dist/astral/index.d.ts", "default": "./dist/astral/index.mjs" },
       "require": { "types": "./dist/astral/index.d.cts", "default": "./dist/astral/index.cjs" }
     },
+    "./apphost": {
+      "import": { "types": "./dist/apphost/index.d.ts", "default": "./dist/apphost/index.mjs" },
+      "require": { "types": "./dist/apphost/index.d.cts", "default": "./dist/apphost/index.cjs" }
+    },
     "./api/dir": {
       "import": { "types": "./dist/api/dir/index.d.ts", "default": "./dist/api/dir/index.mjs" },
       "require": { "types": "./dist/api/dir/index.d.cts", "default": "./dist/api/dir/index.cjs" }

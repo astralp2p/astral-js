@@ -139,13 +139,20 @@ try {
 ## Package layout
 
 ```
-astral-js            → the apphost client: connect, Host, Stream, register, errors
-astral-js/astral     → wire primitives (AstralObject, Identity, ObjectID, Zone, …)
+astral-js            → convenience entry: connect + the wire primitives
+astral-js/astral     → wire primitives (AstralObject, Identity, ObjectID, Zone, errors, …)
+astral-js/apphost    → the apphost WebSocket client lib (connect, Host, Stream, register, IncomingQuery, …)
 astral-js/api/dir    → Dir
 astral-js/api/crypto → Crypto
 astral-js/api/tree   → Tree
 astral-js/api/objects→ Objects
 ```
+
+The three layers mirror astral-go's `astral` / `lib/apphost` / `api/<p>` split:
+primitives, the WebSocket transport lib, and the protocol clients. Most apps
+`import { connect } from 'astral-js'`; import from `astral-js/apphost` when you
+need the fuller apphost surface (the `Host`/`Stream` types, message types, or the
+transport).
 
 Runnable examples are in [`examples/`](./examples). AI-assistant context for
 building on the SDK is in [`.ai/README.md`](./.ai/README.md) (see also

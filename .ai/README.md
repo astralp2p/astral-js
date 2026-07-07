@@ -27,7 +27,8 @@ same `Session` / `Transport` seam.
   eos); `Host.register(id, handler)` → `Registration`; `IncomingQuery` with
   `accept()`/`reject(code)`. Behind `transport.ts` (the only socket creator),
   `receiver.ts` (NDJSON queue), and `session.ts` (the `Session`/`Transport`
-  seam). Bundled into the root `astral-js` entry.
+  seam). Exported at `astral-js/apphost`; the root `astral-js` re-exports just
+  `connect` (plus the primitives) as a convenience entry.
 - `src/api/<p>/` — one client class per protocol, each taking a `Host`:
   `Dir` (`astral-js/api/dir`), `Crypto` (`api/crypto`), `Tree` (`api/tree`),
   `Objects` (`api/objects`). Each method folds args into a query string and

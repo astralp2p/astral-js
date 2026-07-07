@@ -21,3 +21,9 @@ export const version = '0.1.0';
 // from 'astral-js'` works. The apphost client surface (connect, Host, Stream,
 // errors) is added at this root in the apphost phase.
 export * from './astral/index.js';
+
+// The apphost WebSocket client so `import { connect } from 'astral-js'` resolves.
+// Errors (ConnectError, QueryRejected, RouteNotFound, …) are already re-exported
+// via the astral re-export above.
+export { connect, Host, Stream } from './apphost/index.js';
+export type { QueryOptions } from './apphost/index.js';

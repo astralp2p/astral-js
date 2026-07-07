@@ -32,6 +32,10 @@ const HOST_INFO = 'mod.apphost.host_info_msg';
 const AUTH_TOKEN = 'mod.apphost.auth_token_msg';
 const AUTH_SUCCESS = 'mod.apphost.auth_success_msg';
 const ERROR = 'mod.apphost.error_msg';
+const ROUTE_QUERY = 'mod.apphost.route_query_msg';
+const QUERY_ACCEPTED = 'mod.apphost.query_accepted_msg';
+const QUERY_REJECTED = 'mod.apphost.query_rejected_msg';
+const EOS = 'eos';
 
 /** A default host identity: a fixed, valid 66-hex string. */
 export const DEFAULT_HOST_IDENTITY = 'a'.repeat(66);
@@ -48,6 +52,20 @@ interface WireEnvelope {
   Object?: unknown;
 }
 
+/**
+ * A scripted route reply, keyed on the EXACT `Query` string the client sends
+ * (post-args-fold). Exactly one of `accept` / `reject` / `error` applies; a
+ * query with no matching route gets an `error_msg` `{ Code: 'route_not_found' }`.
+ */
+export interface MockRoute {
+  /** On accept: send `query_accepted_msg`, then each of these objects, then `eos`. */
+  accept?: Array<{ type: string; value: unknown }>;
+  /** On reject: send `query_rejected_msg` `{ Code }` with this numeric code. */
+  reject?: number;
+  /** On error: send `error_msg` `{ Code }` with this string code. */
+  error?: string;
+}
+
 /** Options controlling the mock apphost's behaviour. */
 export interface MockApphostOptions {
   /** The host identity announced in `host_info_msg`. Defaults to {@link DEFAULT_HOST_IDENTITY}; pass `null` for the unset case. */
@@ -60,6 +78,11 @@ export interface MockApphostOptions {
   goodToken?: string;
   /** Close each socket immediately, before sending `host_info_msg` (drives the missing-host_info handshake error). */
   closeBeforeHostInfo?: boolean;
+  /**
+   * Scripted `route_query_msg` replies, keyed on the exact folded `Query` string.
+   * An unlisted query is answered with `error_msg` `{ Code: 'route_not_found' }`.
+   */
+  routes?: Record<string, MockRoute>;
 }
 
 /** A running mock apphost server. */
@@ -68,6 +91,11 @@ export interface MockApphost {
   readonly url: string;
   /** The port the server is listening on. */
   readonly port: number;
+  /**
+   * The number of connections accepted so far. A `connect()` handshake plus N
+   * queries opens N+1 sockets, so tests can assert fresh-socket-per-op.
+   */
+  readonly connections: number;
   /** Stop the server, closing any open sockets. Resolves once fully closed. */
   close(): Promise<void>;
 }
@@ -90,6 +118,11 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
     options.guestIdentity === undefined ? DEFAULT_GUEST_IDENTITY : options.guestIdentity;
   const goodToken = options.goodToken ?? DEFAULT_GOOD_TOKEN;
   const closeBeforeHostInfo = options.closeBeforeHostInfo ?? false;
+  const routes = options.routes ?? {};
+
+  // Count every accepted connection. A connect() handshake plus N queries opens
+  // N+1 sockets; the returned MockApphost exposes this via a `connections` getter.
+  let connections = 0;
 
   const wss = new WebSocketServer({
     host: '127.0.0.1',
@@ -99,6 +132,8 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
   });
 
   wss.on('connection', (ws: WsClient) => {
+    connections += 1;
+
     if (closeBeforeHostInfo) {
       // Drop the connection before any host_info_msg: the client sees a close
       // with no hello object and must raise ConnectError.
@@ -119,14 +154,40 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
       } catch {
         return;
       }
-      if (env.Type !== AUTH_TOKEN) return;
 
-      const token = (env.Object as { Token?: unknown } | null)?.Token;
-      const reply =
-        token === goodToken
-          ? envelope(AUTH_SUCCESS, { GuestID: guestIdentity })
-          : envelope(ERROR, { Code: 'auth_failed' });
-      ws.send(reply);
+      if (env.Type === AUTH_TOKEN) {
+        const token = (env.Object as { Token?: unknown } | null)?.Token;
+        const reply =
+          token === goodToken
+            ? envelope(AUTH_SUCCESS, { GuestID: guestIdentity })
+            : envelope(ERROR, { Code: 'auth_failed' });
+        ws.send(reply);
+        return;
+      }
+
+      if (env.Type === ROUTE_QUERY) {
+        const query = (env.Object as { Query?: unknown } | null)?.Query;
+        const route = typeof query === 'string' ? routes[query] : undefined;
+
+        if (!route) {
+          // Unknown route: the host reports route_not_found via error_msg.
+          ws.send(envelope(ERROR, { Code: 'route_not_found' }));
+          return;
+        }
+        if (route.reject !== undefined) {
+          ws.send(envelope(QUERY_REJECTED, { Code: route.reject }));
+          return;
+        }
+        if (route.error !== undefined) {
+          ws.send(envelope(ERROR, { Code: route.error }));
+          return;
+        }
+        // Accept: query_accepted_msg, then each scripted object, then eos.
+        ws.send(envelope(QUERY_ACCEPTED, {}));
+        for (const o of route.accept ?? []) ws.send(envelope(o.type, o.value));
+        ws.send(envelope(EOS, null));
+        return;
+      }
     });
   });
 
@@ -139,6 +200,10 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
       resolve({
         url,
         port,
+        // A live getter so tests read the current count after their operations.
+        get connections() {
+          return connections;
+        },
         close: () =>
           new Promise<void>((res, rej) => {
             for (const client of wss.clients) client.terminate();

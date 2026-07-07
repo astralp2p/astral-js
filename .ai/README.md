@@ -90,8 +90,10 @@ signing/exchange choreography before being treated as frozen.
 ## Working on the SDK
 
 - `npm run check` = typecheck + lint + test + build; every change must keep it green.
-- Tests use a real in-process `ws` mock apphost (`test/mock-apphost.ts`) with
-  `globalThis.WebSocket` swapped in — the client's real socket path runs, no live
-  node needed.
+- Tests are deliberately basic: dependency-free unit tests for the astral-core
+  primitives (`test/astral.test.ts` — envelope, identity, nonce, zone,
+  query-string encoding, errors). The apphost client and protocol clients are
+  covered by typecheck + build (and by exercising them against a live node), not
+  by an in-process mock server — kept simple on purpose.
 - The published surface is validated by `npm run verify:pkg` (publint) plus a
   packed-tarball ESM/CJS/`.d.ts` consumer smoke.

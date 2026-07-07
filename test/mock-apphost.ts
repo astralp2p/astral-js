@@ -139,6 +139,13 @@ export interface MockApphost {
    */
   readonly rejected: Map<string, number>;
   /**
+   * The objects a caller sent on an accepted route (write-op) socket, keyed by
+   * the folded `Query` string. A key appears once the route is accepted; each
+   * object the client then sends is appended until (and excluding) its `eos`.
+   * Lets write-op tests (e.g. `tree.set`) assert what value the client sent.
+   */
+  readonly callerSent: Map<string, CapturedObject[]>;
+  /**
    * Poll `predicate` until it returns truthy or `timeoutMs` elapses. Resolves on
    * success, rejects on timeout. Lets tests await a captured/rejected result
    * without racing the mock's async pushes.
@@ -180,6 +187,12 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
   const accepted = new Map<string, CapturedObject[]>();
   const rejected = new Map<string, number>();
 
+  // Route-path capture. On an accepted route_query the caller socket stays open,
+  // so a write-op client can send a value object (and eos) after reading its
+  // ack. `callerSent` maps a Query string to the objects the caller then sent on
+  // that accepted socket (until eos), so write-op tests can assert them.
+  const callerSent = new Map<string, CapturedObject[]>();
+
   // Count every accepted connection. A connect() handshake plus N queries opens
   // N+1 sockets; the returned MockApphost exposes this via a `connections` getter.
   let connections = 0;
@@ -208,6 +221,11 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
     // Once this socket attaches to a query, it becomes a capture socket: every
     // object it then sends is appended to accepted.get(attachedQueryID) until eos.
     let attachedQueryID: string | null = null;
+
+    // Once this socket's route_query is accepted, it stays open as a write-op
+    // socket: every object the caller then sends is appended to
+    // callerSent.get(acceptedQuery) until the caller's eos.
+    let acceptedQuery: string | null = null;
 
     ws.on('message', (data: unknown, isBinary: boolean) => {
       if (isBinary) return; // JSON mode: ignore binary frames.
@@ -247,6 +265,15 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
           return;
         }
         // Accept: query_accepted_msg, then each scripted object, then eos.
+        // Leave the caller socket OPEN afterward — a write-op client sends its
+        // value object (+ eos) on this same socket after reading the ack, so
+        // closing here would race it onto a dead socket. Mark it a write-op
+        // capture socket and reserve callerSent.get(query) up front so
+        // waitFor(() => callerSent.has(q)) trips as soon as the route accepts.
+        if (typeof query === 'string') {
+          acceptedQuery = query;
+          if (!callerSent.has(query)) callerSent.set(query, []);
+        }
         ws.send(envelope(QUERY_ACCEPTED, {}));
         for (const o of route.accept ?? []) ws.send(envelope(o.type, o.value));
         ws.send(envelope(EOS, null));
@@ -301,6 +328,18 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
         }
         const list = accepted.get(attachedQueryID);
         if (list) list.push({ type: env.Type, value: env.Object ?? null });
+        return;
+      }
+
+      // Anything else on an accepted route (write-op) socket is a caller object:
+      // append it to callerSent.get(acceptedQuery) until the caller's eos.
+      if (acceptedQuery !== null) {
+        if (env.Type === EOS) {
+          acceptedQuery = null;
+          return;
+        }
+        const list = callerSent.get(acceptedQuery);
+        if (list) list.push({ type: env.Type, value: env.Object ?? null });
       }
     });
   });
@@ -321,6 +360,11 @@ export function startMockApphost(options: MockApphostOptions = {}): Promise<Mock
         // Live references so tests observe the mock's async captures.
         accepted,
         rejected,
+        // A getter returning the live callerSent map so write-op tests read the
+        // caller's sent objects after their operations settle.
+        get callerSent() {
+          return callerSent;
+        },
         waitFor: (predicate: () => boolean, timeoutMs = 1000) =>
           new Promise<void>((res, rej) => {
             const deadline = Date.now() + timeoutMs;

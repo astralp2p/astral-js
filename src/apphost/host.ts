@@ -17,14 +17,21 @@
  */
 
 import type { AstralObject } from '../astral/object.js';
-import { obj, isAck } from '../astral/object.js';
+import { obj, isAck, isError } from '../astral/object.js';
 import type { Identity } from '../astral/identity.js';
 import type { Zone } from '../astral/zone.js';
 import { ZoneDefault } from '../astral/zone.js';
 import type { QueryArgs } from '../astral/encoding.js';
 import { buildQueryString } from '../astral/encoding.js';
 import { newNonce } from '../astral/nonce.js';
-import { ConnectError, ProtocolError, QueryRejected, queryErrorForCode } from '../astral/errors.js';
+import {
+  ConnectError,
+  ProtocolError,
+  QueryRejected,
+  RemoteError,
+  queryErrorForCode,
+  readErrorMessage,
+} from '../astral/errors.js';
 import type { ErrorMsg, QueryRejectedMsg, RouteQueryMsg, RegisterServiceMsg } from './messages.js';
 import { MessageTypes } from './messages.js';
 import type { Session, Transport } from './session.js';
@@ -134,6 +141,40 @@ export class Host {
         session.close();
         throw new ProtocolError(`unexpected response to route_query: ${resp.type}`);
     }
+  }
+
+  /**
+   * Route a query and collect every responder object into an array.
+   *
+   * A convenience wrapper over {@link Host.query} for the request/response
+   * shape: it drains the returned {@link Stream} (whose iterator already stops
+   * at `eos`/close), and if any object is a transmittable error it throws a
+   * {@link RemoteError} carrying its message. Non-error objects are collected in
+   * order and returned. Accept/reject/error gating still happens in
+   * {@link Host.query}, so a rejected or `route_not_found` query rejects there
+   * before any object is collected.
+   */
+  async call(queryString: string, opts?: QueryOptions): Promise<AstralObject[]> {
+    const s = await this.query(queryString, opts);
+    const objs: AstralObject[] = [];
+    for await (const o of s) {
+      if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
+      objs.push(o);
+    }
+    return objs;
+  }
+
+  /**
+   * Route a query and return the value of its first responder object, or `null`
+   * if the responder sent none.
+   *
+   * A convenience over {@link Host.call} for single-result queries: it collects
+   * every object (throwing {@link RemoteError} on a transmittable error) and
+   * returns the first object's `value`, or `null` when the response is empty.
+   */
+  async callOne(queryString: string, opts?: QueryOptions): Promise<unknown> {
+    const objs = await this.call(queryString, opts);
+    return objs.length > 0 ? objs[0]!.value : null;
   }
 
   /**

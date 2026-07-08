@@ -12,7 +12,7 @@ const TOKEN = '…';
 const host = await connect(ENDPOINT, { token: TOKEN });
 
 const reg = await host.register(host.guestID ?? host.identity ?? 'anyone', async (q) => {
-  console.log('incoming', q.caller, '→', q.query, q.params);
+  console.log(`incoming ${q.caller} → ${q.query} ${JSON.stringify(q.params)}`);
 
   if (q.query.startsWith('forbidden')) {
     q.reject(1);
@@ -25,7 +25,7 @@ const reg = await host.register(host.guestID ?? host.identity ?? 'anyone', async
   stream.close();
 });
 
-console.log('serving as', host.guestID ?? host.identity);
+console.log(`serving as ${host.guestID ?? host.identity}`);
 
 // The registration stays live until you call reg.unregister() (or the process
 // ends). In a long-running app, keep the process alive and unregister on

@@ -24,7 +24,9 @@
 
 import type { Host } from '../../apphost/host.js';
 import { Ops } from './consts.js';
-import { RemoteError } from '../../astral/errors.js';
+import type { AstralObject } from '../../astral/object.js';
+import { eos, isError } from '../../astral/object.js';
+import { ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
 
 /** Options for {@link Crypto.publicKey}. */
 export interface PublicKeyOptions {
@@ -139,6 +141,42 @@ export class Crypto {
     } catch (err) {
       if (err instanceof RemoteError) return false;
       throw err;
+    }
+  }
+
+  /**
+   * Derive the public key of a specific `privateKey` object.
+   *
+   * The Go op's NATIVE form: `op_public_key.go` reads a streamed private-key
+   * object off the channel and replies with its public key. Opens
+   * `crypto.public_key` with no arguments, *streams* `privateKey`
+   * (`mod.crypto.private_key`) followed by `eos`, then reads the single reply
+   * — the public-key object — returned verbatim as an {@link AstralObject}
+   * (its `value` carries the key material; the JSON `Key` encoding is the
+   * node's). Exercised end-to-end by the settings app's setup ceremony
+   * (mnemonic → seed → derive_key → public_key), unlike the query-arg
+   * {@link Crypto.publicKey} form above, whose live behavior is unconfirmed.
+   *
+   * A wrong input type or a derivation failure streams an `error_message`,
+   * surfaced as a {@link RemoteError}; an empty reply rejects with a
+   * {@link ProtocolError}.
+   *
+   * @param privateKey The `mod.crypto.private_key` object to derive from.
+   * @returns The public-key {@link AstralObject}.
+   */
+  async publicKeyOf(privateKey: AstralObject): Promise<AstralObject> {
+    const stream = await this.host.query(Ops.publicKey);
+    try {
+      stream.send(privateKey);
+      stream.send(eos());
+
+      for await (const o of stream) {
+        if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
+        return o;
+      }
+      throw new ProtocolError('crypto.public_key returned no public key');
+    } finally {
+      stream.close();
     }
   }
 }

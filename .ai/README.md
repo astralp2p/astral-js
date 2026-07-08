@@ -56,10 +56,24 @@ same `Session` / `Transport` seam.
   `set(path, value)` (bidirectional: stream the value + eos, read ack),
   `list(path)→AsyncIterable<string>`, `delete(path,{recursive?})`.
 - **objects** — `probe(id)`, `contains(id)→boolean`, `getType(id)→string`,
-  `find(id)→AsyncIterable<Identity>`.
-- **user** — swarm membership: `newNodeContract(alias)`, `acceptMembership(contract, issuerSig)`, `expel(nodeID)`.
+  `find(id)→AsyncIterable<Identity>`,
+  `store(objects,{repo?})→ObjectID[]` (bidirectional: stream the objects + eos,
+  collect one id per object).
+- **user** — swarm membership: `newNodeContract(alias)`, `acceptMembership(contract, issuerSig)`, `expel(nodeID)`;
+  status/management: `info()→UserInfoValue`, `adopt(target)`,
+  `swarmStatus()→SwarmMemberValue[]` (member tag is the plural
+  `mod.users.swarm_member`).
 - **auth** — permission contracts: `signContract(contract)`, `index(objectID)`.
 - **services** — `discover(follow?)→AsyncIterable` of `services.update`.
+- **nearby** — LAN discovery: `broadcast()`, `list()→AstralObject[]` of
+  `mod.nearby.status` (alias travels inside the `Attachments` bundle).
+- **bip137sig** — BIP-39 key ceremony (all key material stays node-side):
+  `newEntropy({bits?})`, `mnemonic(entropy)→string`,
+  `seed(phrase,{passphrase?})`, `deriveKey(seed,{path?})` (the three input ops
+  stream one object + eos, read one reply).
+- **apphost** (ops, `astral-js/api/apphost` — distinct from the client lib) —
+  `register()→AccessTokenValue` (mint a guest identity + token; reject code 1 =
+  origin policy refusal).
 
 Method names mirror the op strings (camelCase of the op's operation segment):
 `user.new_node_contract`→`newNodeContract`, `auth.index`→`index`, etc. The three
@@ -73,12 +87,16 @@ signing/exchange choreography before being treated as frozen.
 - Deferred: native IPC (binary unix/tcp) transport, `objects.read` (raw
   unframed bytes — not representable over JSON), the advanced protocol ops
   (`dir.apply_filters`/`alias_map`, `crypto` hash-signing, `tree.mount`,
-  `objects` write/describe/search), and the `user` protocol.
+  `objects` describe/search and the write ops beyond `store`, the `apphost`
+  token-management ops).
 - **Needs live-node confirmation** (flagged in the source JSDoc): `crypto.public_key`
-  and `crypto.verify_text_signature` (the Go ops read a *streamed* key/signature
+  and `crypto.verify_text_signature` (the Go ops read a _streamed_ key/signature
   object, not the query arg — the astral-py query form is used here), and
-  `objects.contains` (default-repository dependency). Confirm against a running
-  node before treating these as frozen.
+  `objects.contains` (default-repository dependency), and the settings-app
+  batch (`nearby`, `bip137sig`, `user.{info,adopt,swarm_status}`,
+  `objects.store`, `apphost.register` — grounded in the spec + the astrald
+  server ops, exercised only by the settings app's earlier hand-rolled
+  client). Confirm against a running node before treating these as frozen.
 
 ## Spec (the `system` submodule = astral-docs)
 

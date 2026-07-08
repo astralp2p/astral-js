@@ -6,4 +6,5 @@ export const Ops = {
   contains: 'objects.contains',
   getType: 'objects.get_type',
   find: 'objects.find',
+  store: 'objects.store',
 } as const;

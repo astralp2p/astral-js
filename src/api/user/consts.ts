@@ -5,4 +5,7 @@ export const Ops = {
   newNodeContract: 'user.new_node_contract',
   acceptMembership: 'user.accept_membership',
   expel: 'user.expel',
+  info: 'user.info',
+  adopt: 'user.adopt',
+  swarmStatus: 'user.swarm_status',
 } as const;

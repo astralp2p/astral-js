@@ -16,44 +16,134 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.mjs" },
-      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     },
     "./astral": {
-      "import": { "types": "./dist/astral/index.d.ts", "default": "./dist/astral/index.mjs" },
-      "require": { "types": "./dist/astral/index.d.cts", "default": "./dist/astral/index.cjs" }
+      "import": {
+        "types": "./dist/astral/index.d.ts",
+        "default": "./dist/astral/index.mjs"
+      },
+      "require": {
+        "types": "./dist/astral/index.d.cts",
+        "default": "./dist/astral/index.cjs"
+      }
     },
     "./apphost": {
-      "import": { "types": "./dist/apphost/index.d.ts", "default": "./dist/apphost/index.mjs" },
-      "require": { "types": "./dist/apphost/index.d.cts", "default": "./dist/apphost/index.cjs" }
+      "import": {
+        "types": "./dist/apphost/index.d.ts",
+        "default": "./dist/apphost/index.mjs"
+      },
+      "require": {
+        "types": "./dist/apphost/index.d.cts",
+        "default": "./dist/apphost/index.cjs"
+      }
     },
     "./api/dir": {
-      "import": { "types": "./dist/api/dir/index.d.ts", "default": "./dist/api/dir/index.mjs" },
-      "require": { "types": "./dist/api/dir/index.d.cts", "default": "./dist/api/dir/index.cjs" }
+      "import": {
+        "types": "./dist/api/dir/index.d.ts",
+        "default": "./dist/api/dir/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/dir/index.d.cts",
+        "default": "./dist/api/dir/index.cjs"
+      }
     },
     "./api/crypto": {
-      "import": { "types": "./dist/api/crypto/index.d.ts", "default": "./dist/api/crypto/index.mjs" },
-      "require": { "types": "./dist/api/crypto/index.d.cts", "default": "./dist/api/crypto/index.cjs" }
+      "import": {
+        "types": "./dist/api/crypto/index.d.ts",
+        "default": "./dist/api/crypto/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/crypto/index.d.cts",
+        "default": "./dist/api/crypto/index.cjs"
+      }
     },
     "./api/tree": {
-      "import": { "types": "./dist/api/tree/index.d.ts", "default": "./dist/api/tree/index.mjs" },
-      "require": { "types": "./dist/api/tree/index.d.cts", "default": "./dist/api/tree/index.cjs" }
+      "import": {
+        "types": "./dist/api/tree/index.d.ts",
+        "default": "./dist/api/tree/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/tree/index.d.cts",
+        "default": "./dist/api/tree/index.cjs"
+      }
     },
     "./api/objects": {
-      "import": { "types": "./dist/api/objects/index.d.ts", "default": "./dist/api/objects/index.mjs" },
-      "require": { "types": "./dist/api/objects/index.d.cts", "default": "./dist/api/objects/index.cjs" }
+      "import": {
+        "types": "./dist/api/objects/index.d.ts",
+        "default": "./dist/api/objects/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/objects/index.d.cts",
+        "default": "./dist/api/objects/index.cjs"
+      }
     },
     "./api/user": {
-      "import": { "types": "./dist/api/user/index.d.ts", "default": "./dist/api/user/index.mjs" },
-      "require": { "types": "./dist/api/user/index.d.cts", "default": "./dist/api/user/index.cjs" }
+      "import": {
+        "types": "./dist/api/user/index.d.ts",
+        "default": "./dist/api/user/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/user/index.d.cts",
+        "default": "./dist/api/user/index.cjs"
+      }
     },
     "./api/auth": {
-      "import": { "types": "./dist/api/auth/index.d.ts", "default": "./dist/api/auth/index.mjs" },
-      "require": { "types": "./dist/api/auth/index.d.cts", "default": "./dist/api/auth/index.cjs" }
+      "import": {
+        "types": "./dist/api/auth/index.d.ts",
+        "default": "./dist/api/auth/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/auth/index.d.cts",
+        "default": "./dist/api/auth/index.cjs"
+      }
     },
     "./api/services": {
-      "import": { "types": "./dist/api/services/index.d.ts", "default": "./dist/api/services/index.mjs" },
-      "require": { "types": "./dist/api/services/index.d.cts", "default": "./dist/api/services/index.cjs" }
+      "import": {
+        "types": "./dist/api/services/index.d.ts",
+        "default": "./dist/api/services/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/services/index.d.cts",
+        "default": "./dist/api/services/index.cjs"
+      }
+    },
+    "./api/nearby": {
+      "import": {
+        "types": "./dist/api/nearby/index.d.ts",
+        "default": "./dist/api/nearby/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/nearby/index.d.cts",
+        "default": "./dist/api/nearby/index.cjs"
+      }
+    },
+    "./api/bip137sig": {
+      "import": {
+        "types": "./dist/api/bip137sig/index.d.ts",
+        "default": "./dist/api/bip137sig/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/bip137sig/index.d.cts",
+        "default": "./dist/api/bip137sig/index.cjs"
+      }
+    },
+    "./api/apphost": {
+      "import": {
+        "types": "./dist/api/apphost/index.d.ts",
+        "default": "./dist/api/apphost/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/apphost/index.d.cts",
+        "default": "./dist/api/apphost/index.cjs"
+      }
     },
     "./package.json": "./package.json"
   },
@@ -83,7 +173,9 @@
     "ws": "^8.18.0"
   },
   "peerDependenciesMeta": {
-    "ws": { "optional": true }
+    "ws": {
+      "optional": true
+    }
   },
   "keywords": [
     "astral",

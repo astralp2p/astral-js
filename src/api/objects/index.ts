@@ -26,11 +26,15 @@
  *   - {@link Objects.find} — query `objects.find` with `{ id }`; the node streams
  *     an `identity` per holder until `eos`, each decoded through
  *     {@link parseIdentity} and yielded from an async iterable.
+ *   - {@link Objects.store} — query `objects.store` with `{ repo? }`, then
+ *     *stream* the objects to store followed by `eos` (the bidirectional
+ *     `tree.set` shape); the node replies with one `object_id.sha256` per
+ *     stored object.
  *
- * Only the BASIC operations live here. `objects.read` returns unframed raw bytes
- * (no astral framing) and is out of scope for the `astral.json.v1` transport;
- * the `describe` / `search` / `write` (create/store/delete/…) operations are
- * ADVANCED and intentionally omitted.
+ * Only the BASIC operations plus `store` live here. `objects.read` returns
+ * unframed raw bytes (no astral framing) and is out of scope for the
+ * `astral.json.v1` transport; the `describe` / `search` and the remaining write
+ * (create/delete/push/…) operations are ADVANCED and intentionally omitted.
  *
  * Divergence from the Go client resolved here: Go's `Probe`/`Contains` also take
  * a `repo` argument (defaulting to the main repo server-side); following the
@@ -43,11 +47,18 @@
 import type { Host } from '../../apphost/host.js';
 import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
-import { isError } from '../../astral/object.js';
+import { eos, isError } from '../../astral/object.js';
 import type { Identity } from '../../astral/identity.js';
 import { parseIdentity, isAnyone } from '../../astral/identity.js';
 import type { ObjectID } from '../../astral/objectid.js';
+import { parseObjectID } from '../../astral/objectid.js';
 import { ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
+
+/** Options for {@link Objects.store}. */
+export interface StoreOptions {
+  /** The repository to write into; the node's write-default when omitted. */
+  repo?: string;
+}
 
 /**
  * A client for the `objects` protocol, bound to a connected {@link Host}.
@@ -173,5 +184,39 @@ export class Objects {
         }
       },
     };
+  }
+
+  /**
+   * Store typed objects as new repository entries and return their ids.
+   *
+   * Opens `objects.store` (folding `repo` into the query string when given),
+   * *streams* each object in `objects` followed by `eos`, then collects the
+   * node's replies: one `object_id.sha256` per stored input, in order,
+   * returned as `data1…` strings. Follows the same send-then-read shape as
+   * `tree.set` — the node reads input until `eos`, encodes and commits each
+   * object as a separate entry, and answers with the ids. An unknown
+   * repository or a failed store streams an `error_message`, surfaced as a
+   * {@link RemoteError}.
+   *
+   * @param objects The typed objects to store, each committed as its own entry.
+   * @param opts.repo The repository to write into; the node's write-default
+   *   repository when omitted.
+   * @returns One {@link ObjectID} (`data1…` string) per stored object, in order.
+   */
+  async store(objects: AstralObject[], opts: StoreOptions = {}): Promise<ObjectID[]> {
+    const stream = await this.host.query(Ops.store, { args: { repo: opts.repo } });
+    try {
+      for (const o of objects) stream.send(o);
+      stream.send(eos());
+
+      const ids: ObjectID[] = [];
+      for await (const o of stream) {
+        if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
+        ids.push(parseObjectID(o.value as string));
+      }
+      return ids;
+    } finally {
+      stream.close();
+    }
   }
 }

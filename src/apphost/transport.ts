@@ -26,6 +26,8 @@ export interface WebSocketLike {
   send(data: string): void;
   /** Close the socket. */
   close(): void;
+  /** The socket state (0 connecting, 1 open, 2 closing, 3 closed). */
+  readonly readyState: number;
   /** Subscribe to a socket lifecycle event. */
   addEventListener(
     type: 'open' | 'message' | 'error' | 'close',
@@ -67,15 +69,24 @@ export async function openSocket(url: string): Promise<WebSocketLike> {
 /**
  * Resolve once `ws` fires `open`; reject with {@link ConnectError} if it errors
  * first. Attach the message listener (the {@link Receiver}) before calling this.
+ *
+ * The `readyState` checks cover a socket that settled BEFORE this subscribes:
+ * a same-tick failure dispatches `error`/`close` between construction (inside
+ * the async {@link openSocket}) and this call — e.g. undici fails a fetch-spec
+ * bad-port URL synchronously — and waiting on the already-fired events would
+ * hang forever.
  */
 export function waitOpen(ws: WebSocketLike): Promise<void> {
+  const OPEN = 1;
+  if (ws.readyState === OPEN) return Promise.resolve();
+  if (ws.readyState > OPEN) {
+    return Promise.reject(new ConnectError('socket closed before open'));
+  }
   return new Promise<void>((resolve, reject) => {
     ws.addEventListener('open', () => resolve(), { once: true });
-    ws.addEventListener(
-      'error',
-      (event) => reject(new ConnectError('socket error', event)),
-      { once: true },
-    );
+    ws.addEventListener('error', (event) => reject(new ConnectError('socket error', event)), {
+      once: true,
+    });
   });
 }
 

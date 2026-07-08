@@ -1,5 +1,5 @@
-// The basics example in plain JavaScript — no TypeScript toolchain required.
-// Editors still get full type hints from the bundled .d.ts.
+// The quick-start example in plain JavaScript — no TypeScript toolchain needed.
+// Editors still get full hints from the bundled .d.ts.
 //
 // Node 22+ and browsers have a global WebSocket. On Node 18–21, first:
 //   import { WebSocket } from 'ws'; globalThis.WebSocket = WebSocket;
@@ -10,12 +10,11 @@ const ENDPOINT = 'ws://127.0.0.1:8624/.ws';
 const TOKEN = '…';
 
 const host = await connect(ENDPOINT, { token: TOKEN });
-console.log('connected to', host.alias, host.identity);
+console.log('connected to', host.alias);
 
+// A protocol client:
 const dir = new Dir(host);
 console.log('alice =', await dir.resolve('alice'));
 
-const stream = await host.query('objects.search', { args: { q: 'invoice' } });
-for await (const { type, value } of stream) {
-  console.log(type, value);
-}
+// ...or call any op directly:
+console.log('raw =', await host.callOne('dir.resolve', { args: { name: 'alice' } }));

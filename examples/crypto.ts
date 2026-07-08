@@ -15,10 +15,10 @@ const crypto = new Crypto(host);
 
 // Public keys and signatures are compact "<scheme>:<hex-or-base64>" strings.
 const key = await crypto.publicKey();
-console.log('public key =', key);
+console.log(`public key = ${key}`);
 
 const sig = await crypto.signText('hello world');
-console.log('signature  =', sig);
+console.log(`signature = ${sig}`);
 
 const valid = await crypto.verifyTextSignature('hello world', sig, key);
-console.log('valid?     =', valid);
+console.log(`valid? = ${valid}`);

@@ -10,11 +10,11 @@ const ENDPOINT = 'ws://127.0.0.1:8624/.ws';
 const TOKEN = '…';
 
 const host = await connect(ENDPOINT, { token: TOKEN });
-console.log('connected to', host.alias);
+console.log(`connected to ${host.alias}`);
 
 // A protocol client:
 const dir = new Dir(host);
-console.log('alice =', await dir.resolve('alice'));
+console.log(`alice = ${await dir.resolve('alice')}`);
 
 // ...or call any op directly:
-console.log('raw =', await host.callOne('dir.resolve', { args: { name: 'alice' } }));
+console.log(`raw = ${await host.callOne('dir.resolve', { args: { name: 'alice' } })}`);

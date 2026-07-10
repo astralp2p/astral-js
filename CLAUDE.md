@@ -2,7 +2,7 @@
 
 AI context for this repository lives in **[`.ai/README.md`](./.ai/README.md)** —
 read it first. The authoritative protocol specification is the **`.ai/system`**
-submodule ([astral-docs](https://github.com/cryptopunkscc/astral-docs)); the
+submodule ([astral-docs](https://github.com/astralp2p/astral-docs)); the
 transport/encoding truth is `.ai/system/topics/` (`astral-ipc.md`,
 `ws-transport.md`, `json-encoding.md`) and the per-protocol specs are
 `.ai/system/protocols/<name>/`.

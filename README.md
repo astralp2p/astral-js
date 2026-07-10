@@ -1,7 +1,7 @@
 # astral-js
 
 A browser JavaScript client — with TypeScript typings — for **astrald**, the
-node daemon of the [Astral Network](https://github.com/cryptopunkscc/astral-docs).
+node daemon of the [Astral Network](https://github.com/astralp2p/astral-docs).
 It talks to a local node over the **apphost WebSocket** using the
 `astral.json.v1` protocol, so web apps can route queries through the node, serve
 inbound queries for identities they own, resolve aliases, sign data, and fetch
@@ -160,7 +160,7 @@ transport).
 Runnable examples are in [`examples/`](./examples). AI-assistant context for
 building on the SDK is in [`.ai/README.md`](./.ai/README.md) (see also
 [`CLAUDE.md`](./CLAUDE.md)); the protocol specification is the `.ai/system`
-submodule ([astral-docs](https://github.com/cryptopunkscc/astral-docs)).
+submodule ([astral-docs](https://github.com/astralp2p/astral-docs)).
 
 ## Status & caveats
 

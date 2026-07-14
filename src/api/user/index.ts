@@ -1,7 +1,7 @@
 // api/user — the user protocol client (swarm membership, node contracts, expulsion).
 // Built on the apphost WebSocket client's query. Client-side ops: newNodeContract,
-// acceptMembership, expel; app-facing ops: info, adopt, swarmStatus. Populated
-// by: dev/api-user, dev/api-settings-app.
+// acceptMembership, acceptContract, expel; app-facing ops: info, adopt, swarmStatus.
+// Populated by: dev/api-user, dev/api-settings-app, dev/user-accept-contract.
 
 /**
  * The `user` protocol client: the app-facing slice of a node's swarm-membership
@@ -11,26 +11,26 @@
  * A thin, typed wrapper over a {@link Host} that speaks the `user.*` operations
  * exactly as the reference node serves them. Grounded in both reference
  * implementations, cross-checked with the protocol spec:
- *   - Go client: `api/user/client/{new_node_contract,accept_membership,expel}.go`
+ *   - Go client: `api/user/client/{new_node_contract,accept_membership,accept_contract,expel}.go`
  *     (method names + arg keys + channel flow).
  *   - Go object types: `api/user/{contract,expulsion}.go`, `api/auth/contract.go`,
  *     `api/crypto/signature.go` (the wire type tags below).
  *   - astrald server ops: `mod/user/src/op_{new_node_contract,accept_membership,
- *     expel}.go` (query-arg vs streamed-object flow, reject codes, live-node
- *     preconditions).
+ *     accept_contract,expel}.go` (query-arg vs streamed-object flow, reject
+ *     codes, live-node preconditions).
  *   - Spec: `astral-docs .../protocols/user/ops/user.{new_node_contract,
  *     accept_membership,expel}.md`.
  *
- * Six operations live here: the three CLIENT-driven ceremony ops
+ * Seven operations live here: the four CLIENT-driven ceremony ops
  * ({@link User.newNodeContract}, {@link User.acceptMembership},
- * {@link User.expel}) and the three app-facing status/management ops
- * ({@link User.info}, {@link User.adopt}, {@link User.swarmStatus}), grounded
- * in the protocol spec (`astral-docs .../protocols/user/ops/user.{info,adopt,
- * swarm_status}.md`) and the astrald server ops
- * (`mod/user/src/op_{info,adopt,swarm_status}.go`). The remaining `user.*` op
- * strings (`user.assets`, `user.request_membership`, `user.list_siblings`,
- * `user.list_expelled`, `user.sync_with`, `user.sync_assets`,
- * `user.add_asset`, `user.remove_asset`, `user.accept_contract`) are
+ * {@link User.acceptContract}, {@link User.expel}) and the three app-facing
+ * status/management ops ({@link User.info}, {@link User.adopt},
+ * {@link User.swarmStatus}), grounded in the protocol spec
+ * (`astral-docs .../protocols/user/ops/user.{info,adopt,swarm_status}.md`) and
+ * the astrald server ops (`mod/user/src/op_{info,adopt,swarm_status}.go`). The
+ * remaining `user.*` op strings (`user.assets`, `user.request_membership`,
+ * `user.list_siblings`, `user.list_expelled`, `user.sync_with`,
+ * `user.sync_assets`, `user.add_asset`, `user.remove_asset`) are
  * server/handler-side or lack a client method in the reference SDK, and are
  * intentionally omitted.
  *
@@ -48,7 +48,7 @@
 import type { Host } from '../../apphost/host.js';
 import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
-import { eos, isError } from '../../astral/object.js';
+import { eos, isAck, isError } from '../../astral/object.js';
 import type { Identity } from '../../astral/identity.js';
 import { ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
 
@@ -216,6 +216,57 @@ export class User {
       }
       // The node closed/ended the stream without sending the subject signature.
       throw new ProtocolError('user.accept_membership returned no subject signature');
+    } finally {
+      stream.close();
+    }
+  }
+
+  /**
+   * Activate a fully-signed node contract as this node's active contract.
+   *
+   * The local-setup / cold-card counterpart of {@link User.acceptMembership}:
+   * instead of running the signing ceremony, the caller supplies a `signed`
+   * contract already signed by BOTH the issuer and the subject, and the node
+   * validates, stores, and activates it. This is the setup-time replacement for
+   * a raw `tree.set` of the active-contract path (now a protected op); the node
+   * carries `user.accept_contract` on its pre-user setup allowlist so an
+   * anonymous web guest can complete first-time setup with it.
+   *
+   * WIRE — a bidirectional op with no query arguments, following the same
+   * send-then-ack shape as `tree.set`: it opens `user.accept_contract`,
+   * *streams* the `signed` contract (`mod.auth.signed_contract`), sends `eos` to
+   * end the input, then awaits the node's single `ack`. Resolves once the node
+   * has acknowledged activation (Go `Client.AcceptContract`, server
+   * `OpAcceptContract`).
+   *
+   * LIVE-NODE CAVEAT. The node rejects the query outright (reject code `2`,
+   * surfaced as a {@link QueryRejected} from {@link Host.query}) when it ALREADY
+   * holds an active contract — claiming a node is a one-time transition. It also
+   * streams an `error_message` (surfaced as a {@link RemoteError}) when contract
+   * validation fails: the signatures must verify, the subject must equal the
+   * node, the contract must not be expired, and it must grant swarm membership.
+   *
+   * Rejects with a {@link RemoteError} on a streamed `error_message`, and with a
+   * {@link ProtocolError} if the node ends the stream without acknowledging.
+   *
+   * @param signed The fully-signed node contract to activate
+   *   (`mod.auth.signed_contract`).
+   */
+  async acceptContract(signed: SignedContract): Promise<void> {
+    const stream = await this.host.query(Ops.acceptContract);
+    try {
+      // The signed contract streams on the body (like tree.set's value); eos
+      // ends the input, then the node replies with a single ack.
+      stream.send(signed);
+      stream.send(eos());
+
+      for await (const o of stream) {
+        if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
+        if (isAck(o)) return;
+        throw new ProtocolError(`user.accept_contract expected an ack, got ${o.type}`);
+      }
+      // The node closed/ended the stream without acking.
+      throw new ProtocolError('user.accept_contract was not acknowledged');
     } finally {
       stream.close();
     }

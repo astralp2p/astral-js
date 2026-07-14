@@ -47,7 +47,8 @@
 import type { Host } from '../../apphost/host.js';
 import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
-import { eos, isError } from '../../astral/object.js';
+import { eos, isEos, isError } from '../../astral/object.js';
+import type { Zone } from '../../astral/zone.js';
 import type { Identity } from '../../astral/identity.js';
 import { parseIdentity, isAnyone } from '../../astral/identity.js';
 import type { ObjectID } from '../../astral/objectid.js';
@@ -218,5 +219,73 @@ export class Objects {
     } finally {
       stream.close();
     }
+  }
+
+  /**
+   * Stream the ids of every object in `repo`, optionally following live
+   * additions.
+   *
+   * Sends `objects.scan?repo=<repo>` (with `follow`/`zone` when given) and
+   * yields one {@link ObjectID} per `object_id.sha256` the node streams. In the
+   * default one-shot mode iteration ends at the node's terminating `eos`. In
+   * **follow** mode the node sends the snapshot, an `eos` *separator*, then live
+   * ids as they are added; this uses {@link Stream.frames} so that separator
+   * `eos` does not end iteration — the loop tails until the caller `break`s or
+   * the socket closes. A streamed `error_message` surfaces as a
+   * {@link RemoteError}.
+   *
+   * @param repo The repository to scan.
+   * @param opts.follow Keep the scan open and tail live additions.
+   * @param opts.zone Zone filter for the scan context.
+   * @returns An async iterable of object ids.
+   */
+  async scan(
+    repo: string,
+    opts: { follow?: boolean; zone?: Zone } = {},
+  ): Promise<AsyncIterable<ObjectID>> {
+    const stream = await this.host.query(Ops.scan, {
+      args: { repo, follow: opts.follow, zone: opts.zone },
+    });
+    const follow = opts.follow === true;
+    return {
+      async *[Symbol.asyncIterator](): AsyncGenerator<ObjectID, void, undefined> {
+        try {
+          const source = follow ? stream.frames() : stream[Symbol.asyncIterator]();
+          for await (const o of source) {
+            if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
+            if (isEos(o)) continue; // follow: snapshot/live separator (one-shot mode never reaches here)
+            yield parseObjectID(o.value as string);
+          }
+        } finally {
+          stream.close();
+        }
+      },
+    };
+  }
+
+  /**
+   * Load the object `id` and return its decoded typed representation, or `null`
+   * if the node returns nothing.
+   *
+   * Sends `objects.load?id=<id>` (with `repo`/`zone` when given) and returns the
+   * node's single decoded object (`objects.load` decodes astral payloads into
+   * their typed form; non-astral payloads come back as `blob`). Unlike
+   * `objects.read` (raw bytes, no framing — out of scope for this transport),
+   * `objects.load` is a normal typed reply, collected via {@link Host.call}; a
+   * streamed `error_message` surfaces as a {@link RemoteError}.
+   *
+   * @param id The object id to load.
+   * @param opts.repo Repository to read from; the node's read-default when omitted.
+   * @param opts.zone Zone filter for the read context.
+   * @returns The decoded {@link AstralObject}, or `null` when the node returns none.
+   */
+  async load(
+    id: ObjectID | string,
+    opts: { repo?: string; zone?: Zone } = {},
+  ): Promise<AstralObject | null> {
+    const objs = await this.host.call(Ops.load, {
+      args: { id, repo: opts.repo, zone: opts.zone },
+    });
+    return objs.length > 0 ? objs[0]! : null;
   }
 }

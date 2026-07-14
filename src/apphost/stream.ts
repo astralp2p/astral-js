@@ -47,4 +47,19 @@ export class Stream implements AsyncIterable<AstralObject> {
       yield o;
     }
   }
+
+  /**
+   * Yield **every** inbound object until the socket closes, including any `eos`
+   * markers — for streams where an `eos` is a phase separator rather than the
+   * end (e.g. `objects.scan?follow=true`, which sends the snapshot, an `eos`,
+   * then live additions). The caller decides what each `eos` means and when to
+   * stop (break out of the loop, then `close()`).
+   */
+  async *frames(): AsyncGenerator<AstralObject, void, undefined> {
+    for (;;) {
+      const o = await this.session.recv();
+      if (o === null) return;
+      yield o;
+    }
+  }
 }

@@ -7,4 +7,6 @@ export const Ops = {
   getType: 'objects.get_type',
   find: 'objects.find',
   store: 'objects.store',
+  scan: 'objects.scan',
+  load: 'objects.load',
 } as const;

@@ -25,8 +25,34 @@
 import type { Host } from '../../apphost/host.js';
 import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
-import { eos, isError } from '../../astral/object.js';
+import { obj, eos, isAck, isError } from '../../astral/object.js';
 import { ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
+
+/** The astral type name of a signature object streamed to/from the crypto ops. */
+const SIGNATURE_TYPE = 'mod.crypto.signature';
+/** The key-type prefix of a secp256k1 public key; an astral Identity IS one. */
+const SECP256K1 = 'secp256k1';
+
+/** The wire shape of a `mod.crypto.signature` object (`{ Data, Scheme }`). */
+interface SignatureValue {
+  Data: string;
+  Scheme: string;
+}
+
+/**
+ * Split a compact `<scheme>:<base64>` signature into a `mod.crypto.signature`
+ * object value. A missing scheme defaults to `bip137`.
+ */
+function parseSignature(sig: string): SignatureValue {
+  const i = sig.indexOf(':');
+  if (i < 0) return { Scheme: 'bip137', Data: sig };
+  return { Scheme: sig.slice(0, i), Data: sig.slice(i + 1) };
+}
+
+/** Render a `mod.crypto.signature` object value to compact `<scheme>:<base64>`. */
+function formatSignature(v: SignatureValue): string {
+  return `${v.Scheme}:${v.Data}`;
+}
 
 /** Options for {@link Crypto.publicKey}. */
 export interface PublicKeyOptions {
@@ -51,7 +77,7 @@ export interface SignTextOptions {
  * @example
  * ```ts
  * const crypto = new Crypto(host);
- * const key = await crypto.publicKey();                 // 'bip137:03ab…'
+ * const key = await crypto.publicKey();                 // 'secp256k1:03ab…'
  * const sig = await crypto.signText('hello');           // 'bip137:H9f…'
  * const ok  = await crypto.verifyTextSignature('hello', sig, key); // true
  * ```
@@ -65,28 +91,27 @@ export class Crypto {
   }
 
   /**
-   * Derive the caller's public key in compact `<scheme>:<hex>` text form.
+   * Return the acting identity's public key in compact `<scheme>:<hex>` text
+   * form (e.g. `secp256k1:03ab…`) — the key `signText` signs under by default,
+   * and the key that verifies those signatures.
    *
-   * Sends `crypto.public_key` (folding `scheme` into the query string when
-   * given) and returns the single string result.
+   * This is a LOCAL derivation, not a node round-trip: on astral a secp256k1
+   * public key IS the identity (a 33-byte compressed point rendered as 66 hex),
+   * so the caller's public key is `secp256k1:<acting identity>`. The node's
+   * `crypto.public_key` op does NOT derive "my" key from a query arg — it reads
+   * a streamed `mod.crypto.private_key` and returns that key's public half
+   * (see {@link Crypto.publicKeyOf}); calling it with only args hangs the node,
+   * so the caller-key case is answered here without a query.
    *
-   * DIVERGENCE — needs live-node confirmation. The Go op
-   * (`op_public_key.go`) takes no query arguments and instead reads a streamed
-   * `crypto.PrivateKey` object off the channel, replying with the derived
-   * public key. The Python client (`crypto.py`) instead sends a plain
-   * `crypto.public_key?scheme=…` query via `call_one`. This client follows the
-   * Python `{scheme?}` query form; whether a live node honours the query-arg
-   * `scheme` (versus expecting a streamed private-key object) has NOT been
-   * confirmed against a running node and should be verified before release.
-   *
-   * @param opts.scheme The scheme to derive for; node default when omitted.
-   * @returns The public key as `<scheme>:<hex>`.
+   * @param opts.scheme Reserved; secp256k1 is the only key type an apphost
+   *   identity carries, so the returned prefix is always `secp256k1`.
+   * @returns The acting identity's public key as `secp256k1:<hex>`.
    */
   async publicKey(opts: PublicKeyOptions = {}): Promise<string> {
-    const value = await this.host.callOne(Ops.publicKey, {
-      args: { scheme: opts.scheme },
-    });
-    return value as string;
+    void opts; // scheme is reserved; an apphost identity is always a secp256k1 key
+    const id = this.host.guestID ?? this.host.identity;
+    if (!id) throw new ProtocolError('no acting identity to derive a public key from');
+    return `${SECP256K1}:${id}`;
   }
 
   /**
@@ -104,28 +129,25 @@ export class Crypto {
    * @returns The signature as `<scheme>:<base64>`.
    */
   async signText(text: string, opts: SignTextOptions = {}): Promise<string> {
+    // The node replies with a `mod.crypto.signature` object `{ Data, Scheme }`
+    // (text/key/scheme travel as query args). Render it to compact text.
     const value = await this.host.callOne(Ops.signText, {
       args: { text, key: opts.key, scheme: opts.scheme },
     });
-    return value as string;
+    if (typeof value === 'string') return value; // tolerate an already-compact reply
+    return formatSignature(value as SignatureValue);
   }
 
   /**
    * Verify `sig` over `text` for the public key `key`.
    *
-   * Sends `crypto.verify_text_signature` with `{ text, sig, key }`. The node
-   * acks on a valid signature and streams an `error_message` on an invalid one
-   * (Go `OpVerifyTextSignature`), so a resolved {@link Host.callOne} — whose
-   * value is `null` for the ack — means valid, and a {@link RemoteError} thrown
-   * for the streamed error means invalid. This matches the Python client's
-   * "any non-error result is valid" reading, made explicit here by catching the
-   * error object rather than propagating it.
-   *
-   * DIVERGENCE — needs live-node confirmation. The Go op
-   * (`op_verify_text_signature.go`) reads the signature as a streamed
-   * `crypto.Signature` object off the channel and silently ignores unknown query
-   * args, so the `sig=` query-arg form used here (inherited from astral-py) is
-   * unverified against a running node.
+   * The node op (`op_verify_text_signature.go`) `AcceptRaw()`s and reads the
+   * signature as a **streamed** `mod.crypto.signature` object — there is no
+   * `sig` query arg — so this opens the query with `{ text, key }` as args,
+   * streams the parsed signature object followed by `eos`, then reads the reply:
+   * an `ack` means valid, an `error_message` means invalid. (A prior version
+   * folded `sig` into the query string and streamed nothing, which hung the node
+   * forever while it waited for the signature object.)
    *
    * @param text The text that was signed.
    * @param sig The signature (`<scheme>:<base64>`) to check.
@@ -133,14 +155,17 @@ export class Crypto {
    * @returns `true` if the signature is valid, `false` otherwise.
    */
   async verifyTextSignature(text: string, sig: string, key: string): Promise<boolean> {
+    const stream = await this.host.query(Ops.verifyTextSignature, { args: { text, key } });
     try {
-      await this.host.callOne(Ops.verifyTextSignature, {
-        args: { text, sig, key },
-      });
-      return true;
-    } catch (err) {
-      if (err instanceof RemoteError) return false;
-      throw err;
+      stream.send(obj(SIGNATURE_TYPE, parseSignature(sig)));
+      stream.send(eos());
+      for await (const o of stream) {
+        if (isError(o)) return false; // node streams an error_message on an invalid signature
+        if (isAck(o)) return true; // ack means the signature verified
+      }
+      return false; // stream ended without an ack — treat as not verified
+    } finally {
+      stream.close();
     }
   }
 

@@ -53,7 +53,8 @@ same `Session` / `Transport` seam.
 ## Protocol clients (basic ops)
 
 - **dir** — `resolve(name)→Identity`, `getAlias(id)→string`, `setAlias(id, alias?)→void`.
-- **crypto** — `publicKey({scheme?})`, `signText(text,{key?,scheme?})`, `verifyTextSignature(text,sig,key)→boolean`.
+- **crypto** — `publicKey({scheme?})`, `signText(text,{key?,scheme?})`, `verifyTextSignature(text,sig,key)→boolean`,
+  `signHash(hash,{key?,scheme?})` (scheme sent explicitly, `asn1` default), `verifyHashSignature(hash,sig,key)→boolean`.
 - **tree** — `get(path,{follow?})` (object, or a live `Stream` with `follow`),
   `set(path, value)` (bidirectional: stream the value + eos, read ack),
   `list(path)→AsyncIterable<string>`, `delete(path,{recursive?})`.
@@ -88,7 +89,7 @@ signing/exchange choreography before being treated as frozen.
 
 - Deferred: native IPC (binary unix/tcp) transport, `objects.read` (raw
   unframed bytes — not representable over JSON), the advanced protocol ops
-  (`dir.apply_filters`/`alias_map`, `crypto` hash-signing, `tree.mount`,
+  (`dir.apply_filters`/`alias_map`, `tree.mount`,
   `objects` describe/search and the write ops beyond `store`, the `apphost`
   token-management ops).
 - **Needs live-node confirmation** (flagged in the source JSDoc): `crypto.public_key`

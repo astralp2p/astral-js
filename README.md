@@ -96,6 +96,8 @@ const crypto = new Crypto(host);
 const key = await crypto.publicKey();                              // 'scheme:hex'
 const sig = await crypto.signText('hello');                        // 'scheme:base64'
 const ok = await crypto.verifyTextSignature('hello', sig, key);    // boolean
+const hsig = await crypto.signHash(digestHex);                     // 'asn1:base64'
+const hok = await crypto.verifyHashSignature(digestHex, hsig, key); // boolean
 
 const tree = new Tree(host);
 const value = await tree.get('/net/alias');                        // AstralObject

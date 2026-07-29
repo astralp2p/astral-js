@@ -1,23 +1,20 @@
 // api/crypto — the crypto protocol client (signing / keys).
-// Built on the apphost WebSocket client's query. Basic ops: publicKey,
-// signText, verifyTextSignature. Populated by: dev/api-crypto.
+// Built on the apphost WebSocket client's query. Ops: publicKey, signText,
+// verifyTextSignature, signHash, verifyHashSignature.
+// Populated by: dev/api-crypto; hash ops by: dev/sign-hash.
 
 /**
- * The `crypto` protocol client: public-key derivation, text signing, and
- * signature verification over `astral.json.v1`.
+ * The `crypto` protocol client: public-key derivation, text and hash signing,
+ * and signature verification over `astral.json.v1`.
  *
  * Signatures and public keys travel in the compact text form
- * `<scheme>:<base64-or-hex>` (e.g. `bip137:…`), so the basic ops return and
+ * `<scheme>:<base64-or-hex>` (e.g. `bip137:…`), so the ops return and
  * accept plain strings — there is no per-scheme decoding here. The node holds
  * the private key material; this client only names the key/scheme.
  *
  * Grounded in the reference implementations:
- *   - Go: `mod/crypto/src/op_{public_key,sign_text,verify_text_signature}.go`
+ *   - Go: `mod/crypto/src/op_{public_key,sign_text,verify_text_signature,sign_hash,verify_hash_signature}.go`
  *   - Python: `astral-py/.../protocols/crypto.py` (class `Crypto`)
- *
- * Only the BASIC ops are implemented; the hash-signing ops
- * (`crypto.sign_hash` / `crypto.verify_hash_signature`) are ADVANCED and out of
- * scope for this client.
  *
  * @module api/crypto
  */
@@ -65,6 +62,14 @@ export interface SignTextOptions {
   /** A specific public key (compact `<scheme>:<key>` text) to sign under, instead of the caller's identity. */
   key?: string;
   /** The signature scheme (e.g. `'bip137'`). Node default when omitted. */
+  scheme?: string;
+}
+
+/** Options for {@link Crypto.signHash}. */
+export interface SignHashOptions {
+  /** A specific public key (compact `<scheme>:<key>` text) to sign under, instead of the caller's identity. */
+  key?: string;
+  /** The signature scheme (e.g. `'asn1'`). Sent explicitly; `'asn1'` when omitted. */
   scheme?: string;
 }
 
@@ -156,6 +161,64 @@ export class Crypto {
    */
   async verifyTextSignature(text: string, sig: string, key: string): Promise<boolean> {
     const stream = await this.host.query(Ops.verifyTextSignature, { args: { text, key } });
+    try {
+      stream.send(obj(SIGNATURE_TYPE, parseSignature(sig)));
+      stream.send(eos());
+      for await (const o of stream) {
+        if (isError(o)) return false; // node streams an error_message on an invalid signature
+        if (isAck(o)) return true; // ack means the signature verified
+      }
+      return false; // stream ended without an ack — treat as not verified
+    } finally {
+      stream.close();
+    }
+  }
+
+  /**
+   * Sign a hex-encoded `hash` with a node-held key and return the compact
+   * signature `<scheme>:<base64>`.
+   *
+   * Sends `crypto.sign_hash` with `hash` and, when given, `key` folded into
+   * the query string; with a `hash` argument the node signs immediately and
+   * replies with one `mod.crypto.signature` object (`op_sign_hash.go`). The
+   * streamed `mod.crypto.hash` form is not needed here: a digest is
+   * fixed-size, so it always fits the query string. Signs under the caller's
+   * identity unless `opts.key` names a specific public key.
+   *
+   * The scheme is always sent explicitly. Hash signing defaults to `asn1` on
+   * the node where the text ops default to `bip137`; stating it in the query
+   * keeps the signature's scheme visible on the wire instead of inherited.
+   *
+   * @param hash The hex-encoded hash (digest) to sign.
+   * @param opts.key A specific public key (`<scheme>:<key>`) to sign under.
+   * @param opts.scheme The signature scheme; `'asn1'` when omitted.
+   * @returns The signature as `<scheme>:<base64>`.
+   */
+  async signHash(hash: string, opts: SignHashOptions = {}): Promise<string> {
+    const value = await this.host.callOne(Ops.signHash, {
+      args: { hash, key: opts.key, scheme: opts.scheme ?? 'asn1' },
+    });
+    if (typeof value === 'string') return value; // tolerate an already-compact reply
+    return formatSignature(value as SignatureValue);
+  }
+
+  /**
+   * Verify `sig` over the hex-encoded `hash` for the public key `key`.
+   *
+   * The node op (`op_verify_hash_signature.go`) reads the signature as a
+   * **streamed** `mod.crypto.signature` object — there is no `sig` query arg —
+   * so this opens the query with `{ hash, key }` as args, streams the parsed
+   * signature object followed by `eos`, then reads the reply: an `ack` means
+   * valid, an `error_message` means invalid. The same shape as
+   * {@link Crypto.verifyTextSignature}.
+   *
+   * @param hash The hex-encoded hash that was signed.
+   * @param sig The signature (`<scheme>:<base64>`) to check.
+   * @param key The signer's public key (`<scheme>:<key>`).
+   * @returns `true` if the signature is valid, `false` otherwise.
+   */
+  async verifyHashSignature(hash: string, sig: string, key: string): Promise<boolean> {
+    const stream = await this.host.query(Ops.verifyHashSignature, { args: { hash, key } });
     try {
       stream.send(obj(SIGNATURE_TYPE, parseSignature(sig)));
       stream.send(eos());

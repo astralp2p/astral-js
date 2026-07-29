@@ -5,4 +5,6 @@ export const Ops = {
   publicKey: 'crypto.public_key',
   signText: 'crypto.sign_text',
   verifyTextSignature: 'crypto.verify_text_signature',
+  signHash: 'crypto.sign_hash',
+  verifyHashSignature: 'crypto.verify_hash_signature',
 } as const;

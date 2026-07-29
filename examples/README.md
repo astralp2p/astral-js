@@ -15,7 +15,7 @@ node examples/basics.js
 | File | Shows |
 |------|-------|
 | [`basics.ts`](./basics.ts) | connect, the **`dir`** protocol client, and calling raw ops directly (`host.callOne` / `host.query`) |
-| [`crypto.ts`](./crypto.ts) | the **`crypto`** protocol client — derive a public key, sign text, verify a signature |
+| [`crypto.ts`](./crypto.ts) | the **`crypto`** protocol client — derive a public key, sign text and a hash, verify the signatures |
 | [`serve.ts`](./serve.ts) | register a handler and respond to inbound queries |
 | [`basics.js`](./basics.js) | the basics example in plain JavaScript (no TypeScript toolchain) |
 

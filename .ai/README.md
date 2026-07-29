@@ -61,7 +61,10 @@ same `Session` / `Transport` seam.
 - **objects** — `probe(id)`, `contains(id)→boolean`, `getType(id)→string`,
   `find(id)→AsyncIterable<Identity>`,
   `store(objects,{repo?})→ObjectID[]` (bidirectional: stream the objects + eos,
-  collect one id per object).
+  collect one id per object),
+  `registerBlueprint(bp|bp[])→ObjectID[]` (batch: define an object type; struct
+  or alias kind — node-memory-only, unauthenticated),
+  `getBlueprint(type)→Blueprint` (read a registered type back).
 - **user** — swarm membership: `newNodeContract(alias)`, `acceptMembership(contract, issuerSig)`, `expel(nodeID)`;
   status/management: `info()→UserInfoValue`, `adopt(target)`,
   `swarmStatus()→SwarmMemberValue[]` (member tag is the plural
@@ -90,8 +93,8 @@ signing/exchange choreography before being treated as frozen.
 - Deferred: native IPC (binary unix/tcp) transport, `objects.read` (raw
   unframed bytes — not representable over JSON), the advanced protocol ops
   (`dir.apply_filters`/`alias_map`, `tree.mount`,
-  `objects` describe/search and the write ops beyond `store`, the `apphost`
-  token-management ops).
+  `objects` describe/search and the write ops beyond `store`/blueprint
+  registration, the `apphost` token-management ops).
 - **Needs live-node confirmation** (flagged in the source JSDoc): `crypto.public_key`
   and `crypto.verify_text_signature` (the Go ops read a _streamed_ key/signature
   object, not the query arg — the astral-py query form is used here), and

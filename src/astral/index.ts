@@ -48,6 +48,9 @@ export {
   encodeObjectID,
 } from './objectid.js';
 
+export type { Blueprint, Field, Spec, PrimitiveType } from './blueprint.js';
+export { BLUEPRINT_TYPE, blueprintToValue, blueprintFromValue } from './blueprint.js';
+
 export type { Nonce } from './nonce.js';
 export { NONCE_HEX_LENGTH, newNonce, parseNonce } from './nonce.js';
 

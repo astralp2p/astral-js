@@ -9,4 +9,6 @@ export const Ops = {
   store: 'objects.store',
   scan: 'objects.scan',
   load: 'objects.load',
+  registerBlueprint: 'objects.register_blueprint',
+  getBlueprint: 'objects.get_blueprint',
 } as const;

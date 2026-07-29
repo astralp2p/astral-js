@@ -109,6 +109,16 @@ const objects = new Objects(host);
 const has = await objects.contains(id);                            // boolean
 const type = await objects.getType(id);                           // string
 for await (const holder of await objects.find(id)) console.log(holder);
+
+// Define your own object type, then store/read instances of it.
+await objects.registerBlueprint({
+  type: 'app.message',
+  fields: [
+    { name: 'Author', spec: { kind: 'primitive', primitiveType: 'identity' } },
+    { name: 'Body', spec: { kind: 'primitive', primitiveType: 'string16' } },
+  ],
+});
+const bp = await objects.getBlueprint('app.message');             // Blueprint
 ```
 
 ## Primitives

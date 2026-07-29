@@ -47,12 +47,14 @@
 import type { Host } from '../../apphost/host.js';
 import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
-import { eos, isEos, isError } from '../../astral/object.js';
+import { obj, eos, isEos, isError } from '../../astral/object.js';
 import type { Zone } from '../../astral/zone.js';
 import type { Identity } from '../../astral/identity.js';
 import { parseIdentity, isAnyone } from '../../astral/identity.js';
 import type { ObjectID } from '../../astral/objectid.js';
 import { parseObjectID } from '../../astral/objectid.js';
+import type { Blueprint } from '../../astral/blueprint.js';
+import { BLUEPRINT_TYPE, blueprintToValue, blueprintFromValue } from '../../astral/blueprint.js';
 import { ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
 
 /** Options for {@link Objects.store}. */
@@ -287,5 +289,59 @@ export class Objects {
       args: { id, repo: opts.repo, zone: opts.zone },
     });
     return objs.length > 0 ? objs[0]! : null;
+  }
+
+  /**
+   * Register one or more {@link Blueprint} descriptors and return their ids.
+   *
+   * Opens `objects.register_blueprint` (a batch op), *streams* each descriptor
+   * as an `astral.blueprint` object followed by `eos`, then reads the node's
+   * replies: one `object_id.sha256` per descriptor, in order, plus a final
+   * `eos` the stream iterator stops at. A descriptor the node rejects (invalid
+   * schema, wire-corrupt) streams an `error_message`, surfaced as a
+   * {@link RemoteError}.
+   *
+   * Registration lives in the node's memory: it covers **one node** and does
+   * **not survive a restart**. It is also **unauthenticated** — any peer that
+   * reaches the node can claim a type name (astrald carries a `todo(security)`
+   * to that effect), so a name is first-come and not a trust boundary.
+   *
+   * @param blueprints One descriptor or an array of them.
+   * @returns One {@link ObjectID} (`data1…` string) per descriptor, in order —
+   *   the id of the blueprint's own canonical form.
+   */
+  async registerBlueprint(blueprints: Blueprint | Blueprint[]): Promise<ObjectID[]> {
+    const list = Array.isArray(blueprints) ? blueprints : [blueprints];
+    const stream = await this.host.query(Ops.registerBlueprint);
+    try {
+      for (const bp of list) stream.send(obj(BLUEPRINT_TYPE, blueprintToValue(bp)));
+      stream.send(eos());
+
+      const ids: ObjectID[] = [];
+      for await (const o of stream) {
+        if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
+        ids.push(parseObjectID(o.value as string));
+      }
+      return ids;
+    } finally {
+      stream.close();
+    }
+  }
+
+  /**
+   * Read a registered type's {@link Blueprint} back from the node.
+   *
+   * Sends `objects.get_blueprint?type=<type>` and decodes the single
+   * `astral.blueprint` reply. Lets a consumer read a type it does not itself
+   * define. A primitive type (no blueprint) or an unregistered name streams an
+   * `error_message`, surfaced as a {@link RemoteError}.
+   *
+   * @param type The registered object type name.
+   * @returns The decoded {@link Blueprint} descriptor.
+   */
+  async getBlueprint(type: string): Promise<Blueprint> {
+    const value = await this.host.callOne(Ops.getBlueprint, { args: { type } });
+    if (value == null) throw new ProtocolError('objects.get_blueprint returned no blueprint');
+    return blueprintFromValue(value);
   }
 }

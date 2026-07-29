@@ -32,7 +32,10 @@ import {
   RouteNotFound,
   ProtocolError,
   EncodingError,
+  blueprintToValue,
+  blueprintFromValue,
 } from '../src/astral/index.js';
+import type { Blueprint } from '../src/astral/index.js';
 
 describe('object envelope', () => {
   test('wrap/unwrap round-trip', () => {
@@ -175,6 +178,67 @@ describe('encoding', () => {
   });
   test('buildQueryString enforces the 255-byte cap', () => {
     expect(() => buildQueryString('op', { big: 'x'.repeat(300) })).toThrow(EncodingError);
+  });
+});
+
+describe('blueprint', () => {
+  test('struct round-trips through the astral.blueprint value, all keys present', () => {
+    const bp: Blueprint = {
+      type: 'test.chat.message',
+      fields: [
+        { name: 'Author', spec: { kind: 'primitive', primitiveType: 'identity' } },
+        { name: 'Body', spec: { kind: 'primitive', primitiveType: 'string16' } },
+      ],
+    };
+    const value = blueprintToValue(bp) as Record<string, unknown>;
+    expect(value).toEqual({
+      Type: 'test.chat.message',
+      Underlying: '',
+      Fields: [
+        {
+          Name: 'Author',
+          Spec: { Type: 'astral.blueprint.primitive_spec', Object: { PrimitiveType: 'identity' } },
+        },
+        {
+          Name: 'Body',
+          Spec: { Type: 'astral.blueprint.primitive_spec', Object: { PrimitiveType: 'string16' } },
+        },
+      ],
+    });
+    expect(blueprintFromValue(value)).toEqual(bp);
+  });
+  test('alias round-trips and omits fields', () => {
+    const bp: Blueprint = { type: 'test.mode', underlying: 'uint8' };
+    const value = blueprintToValue(bp) as Record<string, unknown>;
+    expect(value).toEqual({ Type: 'test.mode', Fields: [], Underlying: 'uint8' });
+    expect(blueprintFromValue(value)).toEqual(bp);
+  });
+  test('every Spec carrier round-trips, keeping ref/ptr distinct', () => {
+    const bp: Blueprint = {
+      type: 'test.every',
+      fields: [
+        { name: 'p', spec: { kind: 'primitive', primitiveType: 'uint32' } },
+        { name: 'r', spec: { kind: 'ref', type: 'some.thing' } },
+        { name: 'sl', spec: { kind: 'slice', type: 'object_id.sha256' } },
+        { name: 'het', spec: { kind: 'slice' } },
+        { name: 'ar', spec: { kind: 'array', type: 'uint8', length: 4 } },
+        { name: 'mp', spec: { kind: 'map', keyType: 'string16', valueType: 'uint32' } },
+        { name: 'pt', spec: { kind: 'ptr', type: 'some.thing' } },
+        { name: 'ob', spec: { kind: 'object' } },
+      ],
+    };
+    expect(blueprintFromValue(blueprintToValue(bp))).toEqual(bp);
+  });
+  test('rejects a malformed value and an unknown carrier', () => {
+    expect(() => blueprintFromValue(null)).toThrow(EncodingError);
+    expect(() => blueprintFromValue({ Fields: [] })).toThrow(EncodingError);
+    expect(() =>
+      blueprintFromValue({
+        Type: 't',
+        Underlying: '',
+        Fields: [{ Name: 'x', Spec: { Type: 'astral.blueprint.bogus_spec', Object: {} } }],
+      }),
+    ).toThrow(EncodingError);
   });
 });
 

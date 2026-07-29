@@ -16,6 +16,7 @@ node examples/basics.js
 |------|-------|
 | [`basics.ts`](./basics.ts) | connect, the **`dir`** protocol client, and calling raw ops directly (`host.callOne` / `host.query`) |
 | [`crypto.ts`](./crypto.ts) | the **`crypto`** protocol client — derive a public key, sign text and a hash, verify the signatures |
+| [`blueprints.ts`](./blueprints.ts) | the **`objects`** protocol client — define an object type with a blueprint, store an instance, read the type back |
 | [`serve.ts`](./serve.ts) | register a handler and respond to inbound queries |
 | [`basics.js`](./basics.js) | the basics example in plain JavaScript (no TypeScript toolchain) |
 

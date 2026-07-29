@@ -21,6 +21,7 @@
  * @module astral/blueprint
  */
 
+import { readEnvelope } from './envelope.js';
 import { EncodingError } from './errors.js';
 
 /** The astral type tag of a blueprint descriptor object. */
@@ -134,11 +135,8 @@ function specToWire(spec: Spec): SpecEnvelope {
 
 /** Decode a Spec wire envelope back to a {@link Spec}. */
 function specFromWire(env: unknown): Spec {
-  if (typeof env !== 'object' || env === null) {
-    throw new EncodingError(`invalid spec envelope: ${JSON.stringify(env)}`);
-  }
-  const { Type, Object: o } = env as { Type?: string; Object?: Record<string, unknown> };
-  const obj = o ?? {};
+  const { Type, Object: payload } = readEnvelope(env, 'spec envelope');
+  const obj = (payload ?? {}) as Record<string, unknown>;
   switch (Type) {
     case SPEC_TYPE.primitive:
       return { kind: 'primitive', primitiveType: obj.PrimitiveType as PrimitiveType };

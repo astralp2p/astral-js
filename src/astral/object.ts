@@ -2,9 +2,13 @@
  * The astral object model and its JSON wire envelope.
  *
  * Over `astral.json.v1` every message on the wire is a JSON envelope
- * `{ Type, Object }` (Go-exported field names; `Object` is omitted when empty).
- * Throughout this SDK we work with the friendlier {@link AstralObject}
- * `{ type, value }` and convert at the single seam of {@link wrap}/{@link unwrap}.
+ * `{ Type, Object }` (Go-exported field names). Throughout this SDK we work with
+ * the friendlier {@link AstralObject} `{ type, value }` and convert at the single
+ * seam of {@link wrap}/{@link unwrap}.
+ *
+ * {@link unwrap} converts a container that has already been validated; reading
+ * one off the wire goes through `readEnvelope` in {@link module:astral/envelope},
+ * which rejects a container the spec does not admit.
  *
  * @module astral/object
  */
@@ -17,7 +21,10 @@ export interface AstralObject {
   value: unknown;
 }
 
-/** The on-the-wire JSON envelope. `Object` is absent/omitted when the value is empty. */
+/**
+ * The on-the-wire JSON envelope. Both keys are always emitted; `Object` is
+ * optional here only because a peer may omit it to mean an absent payload.
+ */
 export interface WireEnvelope {
   Type: string;
   Object?: unknown;

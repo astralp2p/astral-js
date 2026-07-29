@@ -34,6 +34,7 @@ import {
   EncodingError,
   blueprintToValue,
   blueprintFromValue,
+  readEnvelope,
 } from '../src/astral/index.js';
 import type { Blueprint } from '../src/astral/index.js';
 
@@ -238,6 +239,53 @@ describe('blueprint', () => {
         Fields: [{ Name: 'x', Spec: { Type: 'astral.blueprint.bogus_spec', Object: {} } }],
       }),
     ).toThrow(EncodingError);
+  });
+
+  // A misspelled Object key fell through `o ?? {}` to an empty payload, so this
+  // decoded to `{ kind: 'slice', type: undefined }` — the heterogeneous slice,
+  // not the uint32 slice meant — and reported nothing.
+  test('rejects a Spec envelope whose payload key is misspelled', () => {
+    expect(() =>
+      blueprintFromValue({
+        Type: 't',
+        Underlying: '',
+        Fields: [
+          { Name: 'x', Spec: { Type: 'astral.blueprint.slice_spec', Obejct: { Type: 'uint32' } } },
+        ],
+      }),
+    ).toThrow(EncodingError);
+  });
+});
+
+describe('envelope', () => {
+  test('reads the two keys under any casing and in any order', () => {
+    expect(readEnvelope({ Type: 'uint8', Object: 7 })).toEqual({ Type: 'uint8', Object: 7 });
+    expect(readEnvelope({ type: 'uint8', object: 7 })).toEqual({ Type: 'uint8', Object: 7 });
+    expect(readEnvelope({ Object: 7, Type: 'uint8' })).toEqual({ Type: 'uint8', Object: 7 });
+  });
+
+  test('a missing Object key is an absent payload', () => {
+    expect(readEnvelope({ Type: 'ack' })).toEqual({ Type: 'ack', Object: null });
+    expect(readEnvelope({ Type: 'ack', Object: null })).toEqual({ Type: 'ack', Object: null });
+  });
+
+  test('rejects an unknown key', () => {
+    expect(() => readEnvelope({ Type: 'uint8', Obejct: 7 })).toThrow(EncodingError);
+    expect(() => readEnvelope({ Type: 'uint8', Object: 7, Extra: 1 })).toThrow(EncodingError);
+  });
+
+  // astral-go let the last key win and astral-py refused it, so one document
+  // carrying two payloads resolved differently on each side.
+  test('rejects two keys differing only in case', () => {
+    expect(() => readEnvelope({ Type: 'uint8', Object: 7, OBJECT: 9 })).toThrow(EncodingError);
+    expect(() => readEnvelope({ Type: 'uint8', TYPE: 'uint16', Object: 7 })).toThrow(EncodingError);
+  });
+
+  test('rejects a container that is not an object, or carries no Type', () => {
+    expect(() => readEnvelope(null)).toThrow(EncodingError);
+    expect(() => readEnvelope([{ Type: 'uint8' }])).toThrow(EncodingError);
+    expect(() => readEnvelope({ Object: 7 })).toThrow(EncodingError);
+    expect(() => readEnvelope({ Type: '', Object: 7 })).toThrow(EncodingError);
   });
 });
 

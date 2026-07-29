@@ -28,6 +28,8 @@ export {
   isUntyped,
 } from './object.js';
 
+export { readEnvelope } from './envelope.js';
+
 export type { Identity } from './identity.js';
 export {
   IDENTITY_HEX_LENGTH,

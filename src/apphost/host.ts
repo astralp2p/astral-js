@@ -64,17 +64,47 @@ export class Host {
   private readonly _identity: Identity | null;
   private readonly _alias: string;
   private readonly _guestID: Identity | null;
+  private readonly _target: Identity | string | null | undefined;
 
   constructor(
     transport: Transport,
     identity: Identity | null,
     alias: string,
     guestID: Identity | null,
+    target?: Identity | string | null,
   ) {
     this.transport = transport;
     this._identity = identity;
     this._alias = alias;
     this._guestID = guestID;
+    this._target = target;
+  }
+
+  /**
+   * A host addressing `target` instead of the node it is connected to.
+   *
+   * Every query this host routes — and therefore every protocol client built on
+   * it — is addressed to `target`, which the connected node routes onward. The
+   * transport, the identity, and the guest id are unchanged: the app still
+   * speaks to its own node, and that node reaches the peer.
+   *
+   * This is the seam for a repository, a directory, or any other protocol held
+   * by another node. A per-query {@link QueryOptions.target} still wins, and
+   * `null` addresses the connected node again.
+   *
+   * @example
+   * ```ts
+   * const theirs = new Objects(host.to(peerIdentity));
+   * for await (const id of await theirs.scan('chat')) { … }
+   * ```
+   */
+  to(target: Identity | string | null): Host {
+    return new Host(this.transport, this._identity, this._alias, this._guestID, target);
+  }
+
+  /** The identity this host addresses, or `null` when it addresses its own node. */
+  get target(): Identity | string | null {
+    return this._target ?? null;
   }
 
   /** The host node's identity announced at connect time, or `null`. */
@@ -106,16 +136,16 @@ export class Host {
   async query(queryString: string, opts: QueryOptions = {}): Promise<Stream> {
     const session = await this.transport.open();
 
-    const folded =
-      opts.args !== undefined ? buildQueryString(queryString, opts.args) : queryString;
+    const folded = opts.args !== undefined ? buildQueryString(queryString, opts.args) : queryString;
 
     const routeQuery: RouteQueryMsg = {
       Nonce: newNonce(),
       // An explicit `caller: null` passes through (the host then fills in its own
       // node identity); an omitted caller defaults to the guest id. Faithful to
       // the reference client's `opts.caller !== undefined ? … : guestID` chain.
-      Caller: ((opts.caller !== undefined ? opts.caller : this._guestID) ?? null) as Identity | null,
-      Target: (opts.target ?? this._identity ?? null) as Identity | null,
+      Caller: ((opts.caller !== undefined ? opts.caller : this._guestID) ??
+        null) as Identity | null,
+      Target: (opts.target ?? this._target ?? this._identity ?? null) as Identity | null,
       Query: folded,
       Zone: opts.zone ?? ZoneDefault,
       Filters: opts.filters ?? null,
@@ -227,10 +257,7 @@ export class Host {
  * identity/alias and assigned guest id, close that throwaway session, and return
  * a {@link Host} that opens fresh sessions per query.
  */
-export async function connect(
-  url: string,
-  opts: { token?: string | null } = {},
-): Promise<Host> {
+export async function connect(url: string, opts: { token?: string | null } = {}): Promise<Host> {
   const transport = new JsonWsTransport(url, opts.token ?? null);
   const session: Session = await transport.open();
   const { hostInfo, guestID } = session;

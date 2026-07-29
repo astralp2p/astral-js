@@ -40,7 +40,6 @@ import type { AstralObject } from '../../astral/object.js';
 import { isError } from '../../astral/object.js';
 import { RemoteError, readErrorMessage } from '../../astral/errors.js';
 
-
 export { UPDATE_TYPE } from './consts.js';
 
 /**

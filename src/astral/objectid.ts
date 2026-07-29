@@ -106,10 +106,7 @@ export function decodeObjectID(id: ObjectID | string): DecodedObjectID {
  * @throws {EncodingError} On a digest that is not 32 bytes or a size outside
  *   the `uint64` range.
  */
-export function encodeObjectID(decoded: {
-  size: bigint | number;
-  hash: Uint8Array;
-}): ObjectID {
+export function encodeObjectID(decoded: { size: bigint | number; hash: Uint8Array }): ObjectID {
   const size = typeof decoded.size === 'bigint' ? decoded.size : BigInt(decoded.size);
   if (size < 0n || size >= 1n << 64n) throw new EncodingError(`size out of uint64 range: ${size}`);
   if (decoded.hash.length !== 32) {

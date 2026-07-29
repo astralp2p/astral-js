@@ -104,9 +104,7 @@ export class IncomingQuery {
     const resp: AstralObject | null = await session.recv();
     if (resp === null || !isAck(resp)) {
       session.close();
-      throw new ProtocolError(
-        `expected ack for attach_query, got ${resp ? resp.type : 'nothing'}`,
-      );
+      throw new ProtocolError(`expected ack for attach_query, got ${resp ? resp.type : 'nothing'}`);
     }
 
     return new Stream(session);

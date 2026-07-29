@@ -100,8 +100,7 @@ describe('object id', () => {
     expect(isObjectID('nope')).toBe(false);
     expect(() => parseObjectID('nope')).toThrow();
   });
-  const hex = (b: Uint8Array) =>
-    Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
   // Reference vectors: ids produced by a live node, size/hash confirmed with
   // astral-go's ParseID. Both are 53 characters — the decoder's leading-zero
   // padding path (11 characters) is exercised, not just the full width.

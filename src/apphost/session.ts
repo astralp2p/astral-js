@@ -18,12 +18,7 @@ import type { AstralObject } from '../astral/object.js';
 import { wrap } from '../astral/object.js';
 import type { Identity } from '../astral/identity.js';
 import { AuthError, ConnectError, ProtocolError } from '../astral/errors.js';
-import type {
-  AuthSuccessMsg,
-  AuthTokenMsg,
-  ErrorMsg,
-  HostInfoMsg,
-} from './messages.js';
+import type { AuthSuccessMsg, AuthTokenMsg, ErrorMsg, HostInfoMsg } from './messages.js';
 import { MessageTypes } from './messages.js';
 import { Receiver } from './receiver.js';
 import type { WebSocketLike } from './transport.js';
@@ -78,12 +73,7 @@ export class JsonWsSession implements Session {
   private readonly receiver: Receiver;
   private closed = false;
 
-  constructor(
-    ws: WebSocketLike,
-    receiver: Receiver,
-    hostInfo: HostInfo,
-    guestID: Identity | null,
-  ) {
+  constructor(ws: WebSocketLike, receiver: Receiver, hostInfo: HostInfo, guestID: Identity | null) {
     this.ws = ws;
     this.receiver = receiver;
     this.hostInfo = hostInfo;

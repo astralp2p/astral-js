@@ -88,26 +88,26 @@ import { Tree } from 'astral-js/api/tree';
 import { Objects } from 'astral-js/api/objects';
 
 const dir = new Dir(host);
-const id = await dir.resolve('alice');       // Identity
-const alias = await dir.getAlias(id);         // 'alice' or ''
-await dir.setAlias(id, 'alice');              // '' clears it
+const id = await dir.resolve('alice'); // Identity
+const alias = await dir.getAlias(id); // 'alice' or ''
+await dir.setAlias(id, 'alice'); // '' clears it
 
 const crypto = new Crypto(host);
-const key = await crypto.publicKey();                              // 'scheme:hex'
-const sig = await crypto.signText('hello');                        // 'scheme:base64'
-const ok = await crypto.verifyTextSignature('hello', sig, key);    // boolean
-const hsig = await crypto.signHash(digestHex);                     // 'asn1:base64'
+const key = await crypto.publicKey(); // 'scheme:hex'
+const sig = await crypto.signText('hello'); // 'scheme:base64'
+const ok = await crypto.verifyTextSignature('hello', sig, key); // boolean
+const hsig = await crypto.signHash(digestHex); // 'asn1:base64'
 const hok = await crypto.verifyHashSignature(digestHex, hsig, key); // boolean
 
 const tree = new Tree(host);
-const value = await tree.get('/net/alias');                        // AstralObject
+const value = await tree.get('/net/alias'); // AstralObject
 await tree.set('/net/alias', { type: 'string8', value: 'alice' }); // write
 for await (const name of await tree.list('/net')) console.log(name);
 await tree.delete('/net/alias');
 
 const objects = new Objects(host);
-const has = await objects.contains(id);                            // boolean
-const type = await objects.getType(id);                           // string
+const has = await objects.contains(id); // boolean
+const type = await objects.getType(id); // string
 for await (const holder of await objects.find(id)) console.log(holder);
 
 // Define your own object type, then store/read instances of it.
@@ -118,7 +118,7 @@ await objects.registerBlueprint({
     { name: 'Body', spec: { kind: 'primitive', primitiveType: 'string16' } },
   ],
 });
-const bp = await objects.getBlueprint('app.message');             // Blueprint
+const bp = await objects.getBlueprint('app.message'); // Blueprint
 ```
 
 ## Primitives
@@ -140,7 +140,14 @@ encodeObjectID({ size, hash }); // the same 'data1…' string
 ## Errors
 
 ```js
-import { connect, ConnectError, AuthError, QueryRejected, RouteNotFound, RemoteError } from 'astral-js';
+import {
+  connect,
+  ConnectError,
+  AuthError,
+  QueryRejected,
+  RouteNotFound,
+  RemoteError,
+} from 'astral-js';
 
 try {
   const host = await connect(url, { token: 'wrong' });

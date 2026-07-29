@@ -40,6 +40,15 @@ import { Stream } from './stream.js';
 import type { IncomingQuery } from './serve.js';
 import { Registration } from './serve.js';
 
+/** Options for binding a {@link Host} with {@link Host.to}. */
+export interface BindOptions {
+  /**
+   * The caller every query carries. `null` asks as the node itself, which is
+   * what a peer-bound host needs — see {@link Host.asNode}.
+   */
+  caller?: Identity | string | null;
+}
+
 /** Options for a single {@link Host.query}. Every field is optional. */
 export interface QueryOptions {
   /** The target identity, or `null`. Defaults to the host's own identity. */
@@ -65,6 +74,7 @@ export class Host {
   private readonly _alias: string;
   private readonly _guestID: Identity | null;
   private readonly _target: Identity | string | null | undefined;
+  private readonly _caller: Identity | string | null | undefined;
 
   constructor(
     transport: Transport,
@@ -72,12 +82,14 @@ export class Host {
     alias: string,
     guestID: Identity | null,
     target?: Identity | string | null,
+    caller?: Identity | string | null,
   ) {
     this.transport = transport;
     this._identity = identity;
     this._alias = alias;
     this._guestID = guestID;
     this._target = target;
+    this._caller = caller;
   }
 
   /**
@@ -98,8 +110,30 @@ export class Host {
    * for await (const id of await theirs.scan('chat')) { … }
    * ```
    */
-  to(target: Identity | string | null): Host {
-    return new Host(this.transport, this._identity, this._alias, this._guestID, target);
+  to(target: Identity | string | null, opts: BindOptions = {}): Host {
+    return new Host(
+      this.transport,
+      this._identity,
+      this._alias,
+      this._guestID,
+      target,
+      'caller' in opts ? opts.caller : this._caller,
+    );
+  }
+
+  /**
+   * A host issuing its queries as the node rather than as this guest.
+   *
+   * A node relays a query to a peer only for a caller it is authorized to relay
+   * for; a guest identity is not one, so a guest's query to a peer is refused
+   * before it leaves. Asking as the node — the caller a node fills in for
+   * itself — is what reaches a peer at all.
+   *
+   * This changes who the *query* is from, never who an object is from: anything
+   * signed is still signed by the guest's own key.
+   */
+  asNode(): Host {
+    return new Host(this.transport, this._identity, this._alias, this._guestID, this._target, null);
   }
 
   /** The identity this host addresses, or `null` when it addresses its own node. */
@@ -143,8 +177,11 @@ export class Host {
       // An explicit `caller: null` passes through (the host then fills in its own
       // node identity); an omitted caller defaults to the guest id. Faithful to
       // the reference client's `opts.caller !== undefined ? … : guestID` chain.
-      Caller: ((opts.caller !== undefined ? opts.caller : this._guestID) ??
-        null) as Identity | null,
+      Caller: ((opts.caller !== undefined
+        ? opts.caller
+        : this._caller !== undefined
+          ? this._caller
+          : this._guestID) ?? null) as Identity | null,
       Target: (opts.target ?? this._target ?? this._identity ?? null) as Identity | null,
       Query: folded,
       Zone: opts.zone ?? ZoneDefault,

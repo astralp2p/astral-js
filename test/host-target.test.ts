@@ -86,6 +86,37 @@ describe('Host.to', () => {
     expect(routed[0]!.Target).toBe(NODE);
   });
 
+  it('asks as the guest by default', async () => {
+    const { transport, routed } = recordingTransport();
+    const host = new Host(transport, NODE, 'node', GUEST);
+
+    await host.query('objects.scan?repo=chat');
+
+    expect(routed[0]!.Caller).toBe(GUEST);
+  });
+
+  it('asks as the node when bound with asNode — what reaching a peer requires', async () => {
+    const { transport, routed } = recordingTransport();
+    const host = new Host(transport, NODE, 'node', GUEST).to(PEER).asNode();
+
+    await host.query('objects.scan?repo=chat');
+
+    // A node relays for itself, not for a guest: a guest's query to a peer is
+    // refused before it leaves.
+    expect(routed[0]!.Caller).toBeNull();
+    expect(routed[0]!.Target).toBe(PEER);
+  });
+
+  it('keeps the caller binding across a rebind of the target', async () => {
+    const { transport, routed } = recordingTransport();
+    const host = new Host(transport, NODE, 'node', GUEST).asNode().to(PEER);
+
+    await host.query('objects.scan?repo=chat');
+
+    expect(routed[0]!.Caller).toBeNull();
+    expect(routed[0]!.Target).toBe(PEER);
+  });
+
   it('carries the binding into every protocol client built on it', async () => {
     const { transport, routed } = recordingTransport();
     const host = new Host(transport, NODE, 'node', GUEST);

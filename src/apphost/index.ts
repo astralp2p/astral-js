@@ -12,7 +12,7 @@
 // Registration, IncomingQuery).
 
 export { connect, Host } from './host.js';
-export type { QueryOptions } from './host.js';
+export type { QueryOptions, BindOptions } from './host.js';
 export { Stream } from './stream.js';
 
 export { Registration, IncomingQuery } from './serve.js';

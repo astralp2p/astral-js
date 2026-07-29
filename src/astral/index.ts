@@ -39,8 +39,14 @@ export {
   fingerprint,
 } from './identity.js';
 
-export type { ObjectID } from './objectid.js';
-export { OBJECT_ID_PREFIX, isObjectID, parseObjectID } from './objectid.js';
+export type { ObjectID, DecodedObjectID } from './objectid.js';
+export {
+  OBJECT_ID_PREFIX,
+  isObjectID,
+  parseObjectID,
+  decodeObjectID,
+  encodeObjectID,
+} from './objectid.js';
 
 export type { Nonce } from './nonce.js';
 export { NONCE_HEX_LENGTH, newNonce, parseNonce } from './nonce.js';

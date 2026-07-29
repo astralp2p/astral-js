@@ -18,7 +18,9 @@ same `Session` / `Transport` seam.
 - `src/astral/` — pure wire primitives, no I/O. The `AstralObject` `{ type, value }`
   model and the `{ Type, Object }` wire envelope (`wrap`/`unwrap`); `obj`/`ack`/
   `eos`/`error` + `isEos`/`isAck`/`isError`; `Identity`/`ObjectID`/`Nonce`/`Zone`
-  string types + `parseIdentity`/`parseObjectID`; the error hierarchy +
+  string types + `parseIdentity`/`parseObjectID`; `decodeObjectID`/
+  `encodeObjectID` (a `data1…` id ↔ its 8-byte size + 32-byte sha256 digest,
+  mirroring astral-go's `ParseID`/`String`); the error hierarchy +
   `queryErrorForCode`; `buildQueryString` (255-byte cap). Exported at
   `astral-js/astral` and re-exported from the root.
 - `src/apphost/` — the WebSocket client, a faithful port of the astrald

@@ -18,6 +18,8 @@ import {
   ANYONE_KEY,
   parseObjectID,
   isObjectID,
+  decodeObjectID,
+  encodeObjectID,
   newNonce,
   parseNonce,
   parseZone,
@@ -94,6 +96,42 @@ describe('object id', () => {
   test('rejects non-data1', () => {
     expect(isObjectID('nope')).toBe(false);
     expect(() => parseObjectID('nope')).toThrow();
+  });
+  const hex = (b: Uint8Array) =>
+    Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  // Reference vectors: ids produced by a live node, size/hash confirmed with
+  // astral-go's ParseID. Both are 53 characters — the decoder's leading-zero
+  // padding path (11 characters) is exercised, not just the full width.
+  test('decodes node-produced ids to their size and digest', () => {
+    const a = decodeObjectID('data1n55r4y4broyysufxq4mbgjy6brf6k31bysboxcyc8gug3quxz9srq');
+    expect(a.size).toBe(45n);
+    expect(hex(a.hash)).toBe('ec9a0682480016995eed2c26483c1217cacc820b060f6018734cd974df7fd88e');
+    const b = decodeObjectID('data1dfgshzq9p7jtfadmrf5myzw3anezqnkq5a8qnrfhysh4womfknxkr');
+    expect(b.size).toBe(50n);
+    expect(hex(b.hash)).toBe('9adcbbbedea625c0d642ed60bd338122ee129dbc1dc221780b735482caa13d44');
+  });
+  test('encodes a decoded id back to the same string', () => {
+    const id = parseObjectID('data1n55r4y4broyysufxq4mbgjy6brf6k31bysboxcyc8gug3quxz9srq');
+    expect(encodeObjectID(decodeObjectID(id))).toBe(id);
+  });
+  test('round-trips an arbitrary size/digest pair', () => {
+    const hash = new Uint8Array(32).map((_, i) => (i * 7 + 3) & 0xff);
+    const decoded = decodeObjectID(encodeObjectID({ size: 1234567n, hash }));
+    expect(decoded.size).toBe(1234567n);
+    expect(decoded.hash).toEqual(hash);
+  });
+  test('round-trips the zero id as data1', () => {
+    const zero = decodeObjectID('data1');
+    expect(zero.size).toBe(0n);
+    expect(zero.hash).toEqual(new Uint8Array(32));
+    expect(encodeObjectID(zero)).toBe('data1');
+  });
+  test('rejects malformed input with EncodingError', () => {
+    expect(() => decodeObjectID('nope1abc')).toThrow(EncodingError);
+    expect(() => decodeObjectID('data1' + 'y'.repeat(65))).toThrow(EncodingError);
+    expect(() => decodeObjectID('data1ab0cd')).toThrow(EncodingError); // '0' is not z-base-32
+    expect(() => encodeObjectID({ size: -1n, hash: new Uint8Array(32) })).toThrow(EncodingError);
+    expect(() => encodeObjectID({ size: 1n, hash: new Uint8Array(31) })).toThrow(EncodingError);
   });
 });
 

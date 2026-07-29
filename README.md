@@ -114,9 +114,15 @@ for await (const holder of await objects.find(id)) console.log(holder);
 The wire primitives live at `astral-js/astral` (and are re-exported from the
 root): the `AstralObject` `{ type, value }` model and its constructors, the
 identity / object-id / nonce / zone string types, and the error hierarchy.
+An object id decodes into its 8-byte size and 32-byte sha256 digest — the
+digest `crypto.sign_hash` takes — and encodes back to the same string.
 
 ```js
 import { obj, ack, eos, parseIdentity, buildQueryString } from 'astral-js/astral';
+import { decodeObjectID, encodeObjectID } from 'astral-js/astral';
+
+const { size, hash } = decodeObjectID('data1…');
+encodeObjectID({ size, hash }); // the same 'data1…' string
 ```
 
 ## Errors

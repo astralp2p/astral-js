@@ -3,8 +3,8 @@
  *
  * apphost operations are addressed by a query string of the form
  * `op?key=value&key2=value2`. Each value is rendered to its bare text form and
- * URI-encoded; the whole string is capped at 255 bytes (UTF-8), matching the
- * node's limit.
+ * URI-encoded; the whole string is capped at the width of the field that
+ * carries it — see {@link MAX_QUERY_STRING}.
  *
  * @module astral/encoding
  */
@@ -15,8 +15,20 @@ import { ZoneDefault } from './zone.js';
 /** Query arguments: a flat map of names to values. `null`/`undefined` are skipped. */
 export type QueryArgs = Record<string, unknown>;
 
-/** The maximum length of a query string, in UTF-8 bytes. */
-export const MAX_QUERY_STRING = 255;
+/**
+ * The maximum length of a query string, in UTF-8 bytes.
+ *
+ * A query string reaches the node in one field of one message — `Query` of
+ * `mod.apphost.route_query_msg` — and the spec declares that field `String16`
+ * (`.ai/system/topics/astral-ipc.md`), so the wire carries 65535 bytes of it.
+ * The cap here is that width and nothing narrower: a client-side limit below
+ * the field's own only refuses queries the node would have answered.
+ *
+ * The distinction is not academic for ops whose arguments carry identities. An
+ * identity is 66 characters, and an argument carrying a set joins it with a
+ * comma, so an op naming one identity and a set of three is already past 255.
+ */
+export const MAX_QUERY_STRING = 65535;
 
 /** The default zone applied to queries when none is given. */
 export const DEFAULT_ZONE = ZoneDefault;
@@ -37,8 +49,8 @@ export function toText(value: unknown): string {
 /**
  * Assemble the query string for an operation and its arguments. Skips
  * `null`/`undefined` values, URI-encodes keys and values, appends with `?` or
- * `&` depending on whether `op` already has a query, and enforces the 255-byte
- * cap (throwing {@link EncodingError} when exceeded).
+ * `&` depending on whether `op` already has a query, and enforces
+ * {@link MAX_QUERY_STRING} (throwing {@link EncodingError} when exceeded).
  */
 export function buildQueryString(op: string, args?: QueryArgs): string {
   let result = op;

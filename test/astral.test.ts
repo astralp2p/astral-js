@@ -32,6 +32,7 @@ import {
   RouteNotFound,
   ProtocolError,
   EncodingError,
+  MAX_QUERY_STRING,
   blueprintToValue,
   blueprintFromValue,
   readEnvelope,
@@ -176,8 +177,23 @@ describe('encoding', () => {
     expect(buildQueryString('op', { q: 'a b&c' })).toBe('op?q=a%20b%26c');
     expect(buildQueryString('op?x=1', { y: 2 })).toBe('op?x=1&y=2');
   });
-  test('buildQueryString enforces the 255-byte cap', () => {
-    expect(() => buildQueryString('op', { big: 'x'.repeat(300) })).toThrow(EncodingError);
+  test('buildQueryString caps at the width of the field that carries it', () => {
+    expect(MAX_QUERY_STRING).toBe(65535);
+    expect(() => buildQueryString('op', { big: 'x'.repeat(MAX_QUERY_STRING) })).toThrow(
+      EncodingError,
+    );
+  });
+  test('buildQueryString passes a query the node accepts', () => {
+    // An identity is 66 characters and a set argument joins with a comma, so an
+    // op naming one identity and three nodes runs past what a string8 would
+    // hold. The node reads a string16, and so does this.
+    const id = (n: number) => `0${n % 2 === 0 ? 2 : 3}${'a'.repeat(64)}`;
+    const built = buildQueryString('contacts.update', {
+      id: id(0),
+      nodes: [id(1), id(2), id(3)].join(','),
+    });
+    expect(built.length).toBeGreaterThan(255);
+    expect(built.startsWith('contacts.update?id=')).toBe(true);
   });
 });
 

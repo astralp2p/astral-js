@@ -125,6 +125,16 @@
         "default": "./dist/api/nearby/index.cjs"
       }
     },
+    "./api/nodes": {
+      "import": {
+        "types": "./dist/api/nodes/index.d.ts",
+        "default": "./dist/api/nodes/index.mjs"
+      },
+      "require": {
+        "types": "./dist/api/nodes/index.d.cts",
+        "default": "./dist/api/nodes/index.cjs"
+      }
+    },
     "./api/bip137sig": {
       "import": {
         "types": "./dist/api/bip137sig/index.d.ts",

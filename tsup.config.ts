@@ -18,6 +18,7 @@ export default defineConfig({
     'api/auth/index': 'src/api/auth/index.ts',
     'api/services/index': 'src/api/services/index.ts',
     'api/nearby/index': 'src/api/nearby/index.ts',
+    'api/nodes/index': 'src/api/nodes/index.ts',
     'api/bip137sig/index': 'src/api/bip137sig/index.ts',
     'api/apphost/index': 'src/api/apphost/index.ts',
   },

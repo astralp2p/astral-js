@@ -73,6 +73,12 @@ same `Session` / `Transport` seam.
 - **services** — `discover(follow?)→AsyncIterable` of `services.update`.
 - **nearby** — LAN discovery: `broadcast()`, `list()→AstralObject[]` of
   `mod.nearby.status` (alias travels inside the `Attachments` bundle).
+- **nodes** — links and endpoints: `links()→AstralObject[]` of
+  `mod.nodes.link_info` (a fact about now), `resolveEndpoints(id)→AstralObject[]`
+  of `mod.nodes.endpoint_with_ttl` (a fact about the past; empty is an answer,
+  not a failure), `newLink(target,{endpoint?,strategies?})→LinkInfoValue`.
+  Endpoints nested in a value stay `{Type,Object}` wire adapters — the library
+  unwraps the frame envelope only.
 - **bip137sig** — BIP-39 key ceremony (all key material stays node-side):
   `newEntropy({bits?})`, `mnemonic(entropy)→string`,
   `seed(phrase,{passphrase?})`, `deriveKey(seed,{path?})` (the three input ops

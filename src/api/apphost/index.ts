@@ -41,6 +41,41 @@ export interface AccessTokenValue {
 }
 
 /**
+ * Join permit names for the op's `permits` argument, refusing any that carries
+ * the separator.
+ */
+function joinPermits(permits: string[]): string {
+  for (const permit of permits) {
+    if (permit.includes(',')) {
+      throw new TypeError(`permit name contains a comma: ${permit}`);
+    }
+  }
+  return permits.join(',');
+}
+
+/**
+ * Options for {@link Apphost.register}.
+ */
+export interface RegisterOptions {
+  /**
+   * Action types the new identity asks to hold, e.g.
+   * `['mod.objects.read_object_action']`. Sent comma-joined as the op's
+   * `permits` argument; omitted entirely when absent or empty, so a call
+   * without permits is the query it always was.
+   *
+   * Asking is not receiving. The node's app-register policy decides what the
+   * new identity actually holds, and the default grants none of them — a
+   * caller learns what it holds by using it, not from the reply, which carries
+   * a token and no statement of what was granted. A trusted web origin may
+   * contribute permits of its own on top of what is asked for.
+   *
+   * An action name carries no comma; one that does would split into two
+   * permits on the wire, so it is rejected here instead.
+   */
+  permits?: string[];
+}
+
+/**
  * A client for the node's `apphost` protocol operations, bound to a connected
  * {@link Host}.
  *
@@ -50,6 +85,11 @@ export interface AccessTokenValue {
  * const apphost = new Apphost(host);
  * const { Token, Identity } = await apphost.register();
  * // reconnect authenticated: connect(url, { token: Token })
+ *
+ * // asking to hold an action:
+ * const creds = await apphost.register({
+ *   permits: ['mod.objects.read_object_action'],
+ * });
  * ```
  */
 export class Apphost {
@@ -63,10 +103,13 @@ export class Apphost {
   /**
    * Provision a fresh guest identity end-to-end and return its credentials.
    *
-   * Sends `apphost.register` (no arguments). The node generates a new keypair,
-   * signs and stores an app contract between the new identity and the node,
-   * and issues an access token — returned as the `value` of a single
-   * `apphost.access_token` object, shaped like {@link AccessTokenValue}.
+   * Sends `apphost.register`, optionally naming the actions the new identity
+   * asks to hold ({@link RegisterOptions.permits}). The node generates a new
+   * keypair, signs and stores an app contract between the new identity and the
+   * node, and issues an access token — returned as the `value` of a single
+   * `apphost.access_token` object, shaped like {@link AccessTokenValue}. Any
+   * permits the policy grants are indexed as a second, node-to-app contract,
+   * so the app's authority chains back through the node.
    *
    * REFUSAL PATHS. Registration is gated by the node's app-register policy
    * over the caller's web origin (`op_register.go` reads the origin from the
@@ -78,10 +121,15 @@ export class Apphost {
    * `error_message`, surfaced as a {@link RemoteError}. Callers should treat
    * all three as "refused".
    *
+   * @param opts Optional {@link RegisterOptions}; `permits` names the actions
+   *   the new identity asks to hold.
    * @returns The minted {@link AccessTokenValue} (`Identity`, `Token`, `ExpiresAt`).
+   * @throws {TypeError} If a permit name contains a comma, which is the
+   *   character that joins them on the wire.
    */
-  async register(): Promise<AccessTokenValue> {
-    const objs = await this.host.call(Ops.register);
+  async register(opts: RegisterOptions = {}): Promise<AccessTokenValue> {
+    const permits = opts.permits?.length ? joinPermits(opts.permits) : undefined;
+    const objs = await this.host.call(Ops.register, { args: { permits } });
     if (objs.length === 0) {
       throw new ProtocolError('apphost.register returned no access token');
     }

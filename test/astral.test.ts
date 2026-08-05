@@ -130,6 +130,19 @@ describe('object id', () => {
     expect(zero.hash).toEqual(new Uint8Array(32));
     expect(encodeObjectID(zero)).toBe('data1');
   });
+  // The library must accept the string it produces. encodeObjectID emits a bare
+  // 'data1' for the zero id — the test above pins that — so a validator that
+  // rejects it contradicts the encoder, and rejects what astral-go now sends:
+  // its ObjectID JSON dropped the '' spelling for 'data1' (astral-go PR #29).
+  test('accepts the zero id it encodes', () => {
+    expect(isObjectID('data1')).toBe(true);
+    expect(parseObjectID('data1')).toBe('data1');
+    expect(parseObjectID(encodeObjectID(decodeObjectID('data1')))).toBe('data1');
+  });
+  // The prefix alone is the zero id; anything shorter is still not an id.
+  test('still rejects a truncated prefix', () => {
+    for (const s of ['', 'd', 'data', 'dat1']) expect(isObjectID(s)).toBe(false);
+  });
   test('rejects malformed input with EncodingError', () => {
     expect(() => decodeObjectID('nope1abc')).toThrow(EncodingError);
     expect(() => decodeObjectID('data1' + 'y'.repeat(65))).toThrow(EncodingError);

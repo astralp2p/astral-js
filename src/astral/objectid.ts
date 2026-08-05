@@ -29,12 +29,19 @@ const DECODED_LENGTH = 40;
 /** The full encoded length: 40 bytes × 8 / 5 bits per character. */
 const ENCODED_LENGTH = 64;
 
-/** Whether `s` looks like a canonical object-id string. */
+/**
+ * Whether `s` looks like a canonical object-id string.
+ *
+ * The bare prefix is the zero id and is valid: the encoder trims leading zero
+ * characters, so a zero size and a zero digest encode to `data1` and nothing
+ * more. Requiring a character after the prefix rejected the one string
+ * {@link encodeObjectID} is guaranteed to produce, and rejects what a node
+ * sends — `astral-go` emits `data1` for the zero id in JSON.
+ */
 export function isObjectID(s: string): s is ObjectID {
   return (
     typeof s === 'string' &&
     s.startsWith(OBJECT_ID_PREFIX) &&
-    s.length > OBJECT_ID_PREFIX.length &&
     s.length <= OBJECT_ID_PREFIX.length + ENCODED_LENGTH
   );
 }

@@ -63,6 +63,21 @@ export interface StoreOptions {
   repo?: string;
 }
 
+/** Options for {@link Objects.scan}. */
+export interface ScanOptions {
+  /** Keep the scan open and tail live additions. */
+  follow?: boolean;
+  /** Zone filter for the scan context. */
+  zone?: Zone;
+  /**
+   * Called once, in follow mode only, when the snapshot/live boundary is
+   * crossed — after the last pre-existing id and before the first live one.
+   * Lets a caller tell an empty repository from one still streaming its
+   * history, without a second scan or a timer. Never called in one-shot mode.
+   */
+  onHistoryComplete?: () => void;
+}
+
 /**
  * A client for the `objects` protocol, bound to a connected {@link Host}.
  *
@@ -233,29 +248,31 @@ export class Objects {
    * **follow** mode the node sends the snapshot, an `eos` *separator*, then live
    * ids as they are added; this uses {@link Stream.frames} so that separator
    * `eos` does not end iteration — the loop tails until the caller `break`s or
-   * the socket closes. A streamed `error_message` surfaces as a
+   * the socket closes. `opts.onHistoryComplete` fires once at that separator, so
+   * a caller can tell an empty repository from one still streaming its history
+   * without a second scan. A streamed `error_message` surfaces as a
    * {@link RemoteError}.
    *
    * @param repo The repository to scan.
-   * @param opts.follow Keep the scan open and tail live additions.
-   * @param opts.zone Zone filter for the scan context.
+   * @param opts See {@link ScanOptions}.
    * @returns An async iterable of object ids.
    */
-  async scan(
-    repo: string,
-    opts: { follow?: boolean; zone?: Zone } = {},
-  ): Promise<AsyncIterable<ObjectID>> {
+  async scan(repo: string, opts: ScanOptions = {}): Promise<AsyncIterable<ObjectID>> {
     const stream = await this.host.query(Ops.scan, {
       args: { repo, follow: opts.follow, zone: opts.zone },
     });
     const follow = opts.follow === true;
+    const onHistoryComplete = opts.onHistoryComplete;
     return {
       async *[Symbol.asyncIterator](): AsyncGenerator<ObjectID, void, undefined> {
         try {
           const source = follow ? stream.frames() : stream[Symbol.asyncIterator]();
           for await (const o of source) {
             if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
-            if (isEos(o)) continue; // follow: snapshot/live separator (one-shot mode never reaches here)
+            if (isEos(o)) {
+              onHistoryComplete?.(); // follow: snapshot/live separator (one-shot mode never reaches here)
+              continue;
+            }
             yield parseObjectID(o.value as string);
           }
         } finally {

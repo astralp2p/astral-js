@@ -59,7 +59,7 @@ function joinPermits(permits: string[]): string {
 export interface RegisterOptions {
   /**
    * Action types the new identity asks to hold, e.g.
-   * `['mod.objects.read_object_action']`. Sent comma-joined as the op's
+   * `['mod.auth.see_objects_action']`. Sent comma-joined as the op's
    * `permits` argument; omitted entirely when absent or empty, so a call
    * without permits is the query it always was.
    *
@@ -88,7 +88,7 @@ export interface RegisterOptions {
  *
  * // asking to hold an action:
  * const creds = await apphost.register({
- *   permits: ['mod.objects.read_object_action'],
+ *   permits: ['mod.auth.see_objects_action'],
  * });
  * ```
  */

@@ -75,21 +75,21 @@ describe('Apphost.register', () => {
     const { transport, routed } = registeringTransport();
 
     await apphostOn(transport).register({
-      permits: ['mod.objects.read_object_action'],
+      permits: ['mod.auth.see_objects_action'],
     });
 
-    expect(routed[0]!.Query).toBe('apphost.register?permits=mod.objects.read_object_action');
+    expect(routed[0]!.Query).toBe('apphost.register?permits=mod.auth.see_objects_action');
   });
 
   it('joins several asked-for actions with a comma', async () => {
     const { transport, routed } = registeringTransport();
 
     await apphostOn(transport).register({
-      permits: ['mod.objects.read_object_action', 'mod.user.swarm_access_action'],
+      permits: ['mod.auth.see_objects_action', 'mod.user.swarm_access_action'],
     });
 
     expect(routed[0]!.Query).toBe(
-      'apphost.register?permits=mod.objects.read_object_action%2Cmod.user.swarm_access_action',
+      'apphost.register?permits=mod.auth.see_objects_action%2Cmod.user.swarm_access_action',
     );
   });
 

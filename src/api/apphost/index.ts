@@ -41,8 +41,8 @@ export interface AccessTokenValue {
 }
 
 /**
- * Join permit names for the op's `permits` argument, refusing any that carries
- * the separator.
+ * Join permit names for the op's `grant_permits` argument, refusing any that
+ * carries the separator.
  */
 function joinPermits(permits: string[]): string {
   for (const permit of permits) {
@@ -58,16 +58,22 @@ function joinPermits(permits: string[]): string {
  */
 export interface RegisterOptions {
   /**
-   * Action types the new identity asks to hold, e.g.
-   * `['mod.auth.see_objects_action']`. Sent comma-joined as the op's
-   * `permits` argument; omitted entirely when absent or empty, so a call
+   * Action types the new identity asks to hold as node-local grants, e.g.
+   * `['mod.auth.see_objects_action']`. A grant is revocable by deleting its
+   * row and is worthless off this node. Sent comma-joined as the op's
+   * `grant_permits` argument; omitted entirely when absent or empty, so a call
    * without permits is the query it always was.
    *
    * Asking is not receiving. The node's app-register policy decides what the
-   * new identity actually holds, and the default grants none of them — a
-   * caller learns what it holds by using it, not from the reply, which carries
-   * a token and no statement of what was granted. A trusted web origin may
-   * contribute permits of its own on top of what is asked for.
+   * new identity actually holds — a caller learns what it holds by using it,
+   * not from the reply, which carries a token and no statement of what was
+   * granted.
+   *
+   * The op can also write a permit into a signed node→app contract
+   * (`contract_permits`), which is portable evidence another node verifies.
+   * This client asks for grants alone, so nothing named here becomes portable.
+   * A trusted web origin's own permits join that contract request, not this
+   * one.
    *
    * An action name carries no comma; one that does would split into two
    * permits on the wire, so it is rejected here instead.
@@ -107,9 +113,10 @@ export class Apphost {
    * asks to hold ({@link RegisterOptions.permits}). The node generates a new
    * keypair, signs and stores an app contract between the new identity and the
    * node, and issues an access token — returned as the `value` of a single
-   * `apphost.access_token` object, shaped like {@link AccessTokenValue}. Any
-   * permits the policy grants are indexed as a second, node-to-app contract,
-   * so the app's authority chains back through the node.
+   * `apphost.access_token` object, shaped like {@link AccessTokenValue}. The
+   * node's register policy decides which asked-for permits are written and
+   * onto which record; the shipped default writes every one as a node-local
+   * grant that expires with the registration.
    *
    * REFUSAL PATHS. Registration is gated by the node's app-register policy
    * over the caller's web origin (`op_register.go` reads the origin from the
@@ -129,7 +136,10 @@ export class Apphost {
    */
   async register(opts: RegisterOptions = {}): Promise<AccessTokenValue> {
     const permits = opts.permits?.length ? joinPermits(opts.permits) : undefined;
-    const objs = await this.host.call(Ops.register, { args: { permits } });
+    // The op declares GrantPermits, which the node's op router reads as
+    // `grant_permits`. An argument the op does not declare is skipped during
+    // binding, so a wrong name registers successfully and grants nothing.
+    const objs = await this.host.call(Ops.register, { args: { grant_permits: permits } });
     if (objs.length === 0) {
       throw new ProtocolError('apphost.register returned no access token');
     }

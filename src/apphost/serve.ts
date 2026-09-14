@@ -46,7 +46,10 @@ export class IncomingQuery {
   readonly target: string | null;
   /** The query path — the full query string before any `?`. */
   readonly query: string;
-  /** The parsed query-string arguments, excluding the auto-injected `in`/`out=json`. */
+  /**
+   * The parsed query-string arguments, excluding the auto-injected `in`/`out=json`.
+   * A repeated key keeps its first value.
+   */
   readonly params: Record<string, string>;
   /** The full, undecorated query string as announced. */
   readonly queryString: string;
@@ -77,6 +80,8 @@ export class IncomingQuery {
       const search = new URLSearchParams(full.slice(i + 1));
       for (const [key, value] of search) {
         if ((key === 'in' || key === 'out') && value === 'json') continue;
+        // A repeated key keeps its first value, as astral-go's query.Parse does.
+        if (Object.hasOwn(params, key)) continue;
         params[key] = value;
       }
     }

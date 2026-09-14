@@ -63,7 +63,7 @@ same `Session` / `Transport` seam.
   `store(objects,{repo?})→ObjectID[]` (bidirectional: stream the objects + eos,
   collect one id per object),
   `registerBlueprint(bp|bp[])→ObjectID[]` (batch: define an object type; struct
-  or alias kind — node-memory-only, unauthenticated),
+  or alias kind — node-memory-only, requires `mod.auth.store_objects_action`),
   `getBlueprint(type)→Blueprint` (read a registered type back).
 - **user** — swarm membership: `newNodeContract(alias)`, `acceptMembership(contract, issuerSig)`, `expel(nodeID)`;
   status/management: `info()→UserInfoValue`, `adopt(target)`,

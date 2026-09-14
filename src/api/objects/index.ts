@@ -319,9 +319,13 @@ export class Objects {
    * {@link RemoteError}.
    *
    * Registration lives in the node's memory: it covers **one node** and does
-   * **not survive a restart**. It is also **unauthenticated** — any peer that
-   * reaches the node can claim a type name (astrald carries a `todo(security)`
-   * to that effect), so a name is first-come and not a trust boundary.
+   * **not survive a restart**. The caller must hold
+   * `mod.auth.store_objects_action`; a caller without it is rejected before the
+   * node opens a repository.
+   *
+   * A type name is still first-come within the node's lifetime: any holder of
+   * `mod.auth.store_objects_action` can take a name, and a name is not
+   * reclaimable the way a stored object is.
    *
    * @param blueprints One descriptor or an array of them.
    * @returns One {@link ObjectID} (`data1…` string) per descriptor, in order —

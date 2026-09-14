@@ -15,8 +15,8 @@ const host = await connect(ENDPOINT, { token: TOKEN });
 const objects = new Objects(host);
 
 // Describe a two-field struct type and register it with the node.
-// Registration is node-memory-only (does not survive a restart) and
-// unauthenticated (any peer can claim a type name).
+// Registration is node-memory-only (does not survive a restart) and requires
+// mod.auth.store_objects_action.
 const [blueprintID] = await objects.registerBlueprint({
   type: 'example.message',
   fields: [

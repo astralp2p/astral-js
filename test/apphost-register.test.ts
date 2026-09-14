@@ -78,19 +78,34 @@ describe('Apphost.register', () => {
       permits: ['mod.auth.see_objects_action'],
     });
 
-    expect(routed[0]!.Query).toBe('apphost.register?permits=mod.auth.see_objects_action');
+    expect(routed[0]!.Query).toBe('apphost.register?grant_permits=mod.auth.see_objects_action');
   });
 
   it('joins several asked-for actions with a comma', async () => {
     const { transport, routed } = registeringTransport();
 
     await apphostOn(transport).register({
-      permits: ['mod.auth.see_objects_action', 'mod.user.swarm_access_action'],
+      permits: ['mod.auth.see_objects_action', 'mod.user.see_swarm_action'],
     });
 
     expect(routed[0]!.Query).toBe(
-      'apphost.register?permits=mod.auth.see_objects_action%2Cmod.user.swarm_access_action',
+      'apphost.register?grant_permits=mod.auth.see_objects_action%2Cmod.user.see_swarm_action',
     );
+  });
+
+  // Pins the wire name against astrald's opRegisterArgs, which declares
+  // GrantPermits and ContractPermits and nothing called `permits`. This client
+  // sent `permits` until this test existed, and nothing reported it: an
+  // argument the op does not declare is skipped during binding, so the app
+  // received a token and held none of what it named.
+  it('names the argument apphost.register reads', async () => {
+    const { transport, routed } = registeringTransport();
+
+    await apphostOn(transport).register({ permits: ['mod.user.see_swarm_action'] });
+
+    const args = new URLSearchParams(String(routed[0]!.Query).split('?')[1]);
+    expect(args.get('grant_permits')).toBe('mod.user.see_swarm_action');
+    expect(args.has('permits')).toBe(false);
   });
 
   it('refuses a permit name carrying the separator', async () => {

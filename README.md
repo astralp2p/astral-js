@@ -50,8 +50,8 @@ for await (const { type, value } of stream) {
 For single-result queries there are helpers on `Host`:
 
 ```js
-const objs = await host.call('dir.get_alias', { args: { id } }); // AstralObject[]
-const one = await host.callOne('dir.resolve', { args: { name: 'alice' } }); // first value
+const objs = await host.call('dir.get_alias', { args: { identity: id } }); // AstralObject[]
+const one = await host.callOne('dir.resolve', { args: { identity: 'alice' } }); // first value
 ```
 
 ## Serve inbound queries

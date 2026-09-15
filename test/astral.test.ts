@@ -183,8 +183,8 @@ describe('encoding', () => {
   });
   test('buildQueryString folds args, skips null, URI-encodes', () => {
     expect(buildQueryString('dir.resolve')).toBe('dir.resolve');
-    expect(buildQueryString('dir.resolve', { name: 'alice', zone: 'dvn' })).toBe(
-      'dir.resolve?name=alice&zone=dvn',
+    expect(buildQueryString('dir.resolve', { identity: 'alice', zone: 'dvn' })).toBe(
+      'dir.resolve?identity=alice&zone=dvn',
     );
     expect(buildQueryString('op', { a: null, b: 1 })).toBe('op?b=1');
     expect(buildQueryString('op', { q: 'a b&c' })).toBe('op?q=a%20b%26c');

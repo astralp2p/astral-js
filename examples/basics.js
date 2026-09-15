@@ -17,4 +17,4 @@ const dir = new Dir(host);
 console.log(`alice = ${await dir.resolve('alice')}`);
 
 // ...or call any op directly:
-console.log(`raw = ${await host.callOne('dir.resolve', { args: { name: 'alice' } })}`);
+console.log(`raw = ${await host.callOne('dir.resolve', { args: { identity: 'alice' } })}`);

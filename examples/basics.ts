@@ -25,7 +25,7 @@ console.log(`alias of alice = ${await dir.getAlias(alice)}`);
 
 // ── Calling any astrald op directly (no protocol client needed) ──
 // host.callOne(op, { args }) runs a query and returns the first result's value.
-const sameAlice = await host.callOne('dir.resolve', { args: { name: 'alice' } });
+const sameAlice = await host.callOne('dir.resolve', { args: { identity: 'alice' } });
 console.log(`raw dir.resolve = ${String(sameAlice)}`);
 
 // host.query(op, { args }) returns a Stream you iterate to end-of-stream.

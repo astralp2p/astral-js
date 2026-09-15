@@ -159,7 +159,7 @@ export class Nodes {
   /**
    * Resolve every endpoint the node knows for an identity.
    *
-   * Sends `nodes.resolve_endpoints?id=<id>`, asking each registered resolver;
+   * Sends `nodes.resolve_endpoints?identity=<id>`, asking each registered resolver;
    * the node streams one `mod.nodes.endpoint_with_ttl` per endpoint, terminated
    * by `eos`. Each is returned verbatim as an {@link AstralObject} whose `value`
    * is shaped like {@link EndpointWithTTLValue}.
@@ -175,13 +175,13 @@ export class Nodes {
    * @throws {QueryRejected} Code `2` if the identity cannot be resolved.
    */
   async resolveEndpoints(id: Identity | string): Promise<AstralObject[]> {
-    return this.host.call(Ops.resolveEndpoints, { args: { id } });
+    return this.host.call(Ops.resolveEndpoints, { args: { identity: id } });
   }
 
   /**
    * Open a link to an identity, and return the link it opened.
    *
-   * Sends `nodes.new_link?target=<target>`, dialling
+   * Sends `nodes.new_link?identity=<target>`, dialling
    * {@link NewLinkOptions.endpoint} when one is given and otherwise running
    * link strategies until one succeeds. The node replies with a single
    * `mod.nodes.link_info` describing the new link.
@@ -203,7 +203,7 @@ export class Nodes {
   async newLink(target: Identity | string, opts: NewLinkOptions = {}): Promise<LinkInfoValue> {
     const strategies = opts.strategies?.length ? joinStrategies(opts.strategies) : undefined;
     const objs = await this.host.call(Ops.newLink, {
-      args: { target, endpoint: opts.endpoint, strategies },
+      args: { identity: target, endpoint: opts.endpoint, strategies },
     });
     if (objs.length === 0) {
       throw new ProtocolError('nodes.new_link returned no link info');

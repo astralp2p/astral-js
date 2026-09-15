@@ -101,7 +101,7 @@ describe('Nodes.resolveEndpoints', () => {
 
     const found = await nodesOn(transport).resolveEndpoints(PEER);
 
-    expect(routed[0]!.Query).toBe(`nodes.resolve_endpoints?id=${PEER}`);
+    expect(routed[0]!.Query).toBe(`nodes.resolve_endpoints?identity=${PEER}`);
     expect((found[0]!.value as EndpointWithTTLValue).TTL).toBe(7776000);
   });
 
@@ -126,14 +126,14 @@ describe('Nodes.resolveEndpoints', () => {
 });
 
 describe('Nodes.newLink', () => {
-  it('sends only the target when nothing else is asked for', async () => {
+  it('sends only the identity when nothing else is asked for', async () => {
     const { transport, routed } = recordingTransport([
       { type: 'mod.nodes.link_info', value: { ...LINK } },
     ]);
 
     const link = await nodesOn(transport).newLink(PEER);
 
-    expect(routed[0]!.Query).toBe(`nodes.new_link?target=${PEER}`);
+    expect(routed[0]!.Query).toBe(`nodes.new_link?identity=${PEER}`);
     expect(link.ID).toBe('7c1a93b50f2e4d18');
   });
 
@@ -145,7 +145,7 @@ describe('Nodes.newLink', () => {
     await nodesOn(transport).newLink(PEER, { endpoint: 'tcp:1.2.3.4:1791' });
 
     expect(routed[0]!.Query).toBe(
-      `nodes.new_link?target=${PEER}&endpoint=tcp%3A1.2.3.4%3A1791`,
+      `nodes.new_link?identity=${PEER}&endpoint=tcp%3A1.2.3.4%3A1791`,
     );
   });
 
@@ -156,7 +156,7 @@ describe('Nodes.newLink', () => {
 
     await nodesOn(transport).newLink(PEER, { strategies: ['basic', 'tor'] });
 
-    expect(routed[0]!.Query).toBe(`nodes.new_link?target=${PEER}&strategies=basic%2Ctor`);
+    expect(routed[0]!.Query).toBe(`nodes.new_link?identity=${PEER}&strategies=basic%2Ctor`);
   });
 
   it('omits an empty strategy list', async () => {
@@ -166,7 +166,7 @@ describe('Nodes.newLink', () => {
 
     await nodesOn(transport).newLink(PEER, { strategies: [] });
 
-    expect(routed[0]!.Query).toBe(`nodes.new_link?target=${PEER}`);
+    expect(routed[0]!.Query).toBe(`nodes.new_link?identity=${PEER}`);
   });
 
   it('refuses a strategy name carrying the separator', async () => {

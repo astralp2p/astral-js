@@ -276,18 +276,18 @@ export class User {
    * Permanently ban `nodeID` from the swarm and return the signed
    * {@link SignedExpulsion} (the ban).
    *
-   * Sends query `user.expel?target=<nodeID>` and decodes the node's single
+   * Sends query `user.expel?identity=<nodeID>` and decodes the node's single
    * result — a `mod.user.signed_expulsion` object — returned verbatim as an
    * {@link AstralObject}. The ban is identity-level and irreversible.
    *
-   * WIRE — the target is a query argument (the Go client sends
-   * `query.Args{"target": nodeID}`), NOT a streamed object; the result is a
+   * WIRE — the node to expel is the `identity` query argument (the server op
+   * reads `Identity`, `op_expel.go`), NOT a streamed object; the result is a
    * single object. Passing an {@link Identity} or its string form both fold to
-   * the same `target=<id>` arg.
+   * the same `identity=<id>` arg.
    *
    * LIVE-NODE CAVEAT. The node rejects the query (surfaced as a
    * {@link QueryRejected} from {@link Host.query}) when it has no active contract
-   * (reject code `2`), when `target` cannot be resolved to an identity (code
+   * (reject code `2`), when `nodeID` cannot be resolved to an identity (code
    * `3`), or when the caller is not authorized for the expel action (code `4`) —
    * in the reference node only the active contract's issuer is. On resolution or
    * expulsion failure past the accept gate the node streams an `error_message`,
@@ -298,7 +298,7 @@ export class User {
    * @returns The `mod.user.signed_expulsion` {@link AstralObject}.
    */
   async expel(nodeID: Identity | string): Promise<SignedExpulsion> {
-    const objs = await this.host.call(Ops.expel, { args: { target: nodeID } });
+    const objs = await this.host.call(Ops.expel, { args: { identity: nodeID } });
     if (objs.length === 0) {
       throw new ProtocolError('user.expel returned no signed expulsion');
     }
@@ -333,7 +333,7 @@ export class User {
    * Issue a swarm membership contract for the node `target` and return the
    * signed result.
    *
-   * Sends `user.adopt?target=<target>` and decodes the node's single result —
+   * Sends `user.adopt?identity=<target>` and decodes the node's single result —
    * a `mod.auth.signed_contract` object — returned verbatim as an
    * {@link AstralObject}. After indexing, the node pushes the signed contract
    * to the local swarm asynchronously and schedules a sync task for the new
@@ -355,7 +355,7 @@ export class User {
    * @returns The issued `mod.auth.signed_contract` {@link AstralObject}.
    */
   async adopt(target: Identity | string): Promise<SignedContract> {
-    const objs = await this.host.call(Ops.adopt, { args: { target } });
+    const objs = await this.host.call(Ops.adopt, { args: { identity: target } });
     if (objs.length === 0) {
       throw new ProtocolError('user.adopt returned no signed contract');
     }

@@ -64,7 +64,9 @@ same `Session` / `Transport` seam.
   collect one id per object),
   `registerBlueprint(bp|bp[])→ObjectID[]` (batch: define an object type; struct
   or alias kind — node-memory-only, requires `mod.auth.store_objects_action`),
-  `getBlueprint(type)→Blueprint` (read a registered type back).
+  `getBlueprint(type)→Blueprint` (read a registered type back),
+  `repositories()→RepositoryInfoValue[]` (the repository tree; `Kind` is
+  `repository` or `group` — an empty group looks like a leaf in `Children`).
 - **user** — swarm membership: `newNodeContract(alias)`, `acceptMembership(contract, issuerSig)`, `expel(nodeID)`;
   status/management: `info()→UserInfoValue`, `adopt(target)`,
   `swarmStatus()→SwarmMemberValue[]` (member tag is the plural

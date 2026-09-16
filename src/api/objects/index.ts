@@ -19,8 +19,8 @@
  *     `Repo` / `Mime` / `Time`), returned as a raw {@link AstralObject} so the
  *     caller can read its `value` without this SDK imposing a schema (an empty
  *     response rejects with a {@link ProtocolError}).
- *   - {@link Objects.contains} — query `objects.contains` with `{ id }`; the node
- *     replies with one `bool`, coerced to a JS `boolean`.
+ *   - {@link Objects.contains} — query `objects.contains` with `{ repo, id }`;
+ *     the node replies with one `bool`, coerced to a JS `boolean`.
  *   - {@link Objects.find} — query `objects.find` with `{ id }`; the node streams
  *     an `identity` per holder until `eos`, each decoded through
  *     {@link parseIdentity} and yielded from an async iterable.
@@ -37,10 +37,11 @@
  * `astral.json.v1` transport; the `describe` / `search` and the remaining write
  * (create/delete/push/…) operations are ADVANCED and intentionally omitted.
  *
- * Divergence from the Go client resolved here: Go's `Probe`/`Contains` also take
- * a `repo` argument (defaulting to the main repo server-side); following the
- * Python client (`protocols/objects.py`) and the BASIC scope, these methods fold
- * `{ id }` only, letting the node pick the default repository.
+ * `repo` follows what astrald requires of each op, not a uniform SDK choice:
+ * `objects.probe` leaves `Repo` optional and {@link Objects.probe} omits it,
+ * letting the node pick the default repository; `objects.contains` tags `Repo`
+ * `query:"required"` and {@link Objects.contains} takes it positionally, as the
+ * Python client does.
  *
  * @module api/objects
  */
@@ -129,7 +130,7 @@ export interface RepositoryInfoValue {
  * const objects = new Objects(host);
  * const probe = await objects.probe('data1...');   // descriptor AstralObject
  * const type = (probe.value as { Type: string }).Type; // 'mod.dir.alias_map' etc.
- * const has = await objects.contains('data1...');   // boolean
+ * const has = await objects.contains('local', 'data1...'); // boolean
  * for await (const holder of await objects.find('data1...')) {
  *   // holder: Identity
  * }
@@ -167,24 +168,26 @@ export class Objects {
   }
 
   /**
-   * Return whether the object `id` is available locally.
+   * Return whether the repository `repo` holds the object `id`.
    *
-   * Sends query `objects.contains?id=<id>` and coerces the node's single `bool`
-   * result to a JS `boolean` (a missing result or a falsy value both yield
-   * `false`). Rejects with a {@link RemoteError} if the node reports a failure
-   * (e.g. an unknown repository).
+   * Sends query `objects.contains?repo=<repo>&id=<id>` and coerces the node's
+   * single `bool` result to a JS `boolean` (a missing result or a falsy value
+   * both yield `false`). Rejects with a {@link RemoteError} if the node reports
+   * a failure (e.g. an unknown repository).
    *
-   * CAVEAT — needs live-node confirmation. Unlike `objects.probe` (which reads
-   * the default repository), the Go `op_contains` looks up the repository under
-   * the empty key, so `contains` with no `repo` arg may error on a node that has
-   * no default (empty-keyed) repository registered. A `repo` argument is not yet
-   * exposed here (basic scope).
+   * `repo` is required and positional, matching the Python client. astrald tags
+   * it `query:"required"` (`mod/objects/src/op_contains.go:11`), so a query
+   * without it is rejected with `QueryRejected` before the op runs — unlike
+   * {@link Objects.probe}, whose `Repo` is optional. Use
+   * {@link Objects.repositories} to discover the names a node serves; `local`
+   * is the usual default.
    *
+   * @param repo The repository to test (a `Name` from {@link Objects.repositories}).
    * @param id The object id to test (an {@link ObjectID} or its `data1…` string).
-   * @returns `true` if the node holds the object, `false` otherwise.
+   * @returns `true` if the repository holds the object, `false` otherwise.
    */
-  async contains(id: ObjectID | string): Promise<boolean> {
-    const value = await this.host.callOne(Ops.contains, { args: { id } });
+  async contains(repo: string, id: ObjectID | string): Promise<boolean> {
+    const value = await this.host.callOne(Ops.contains, { args: { repo, id } });
     return Boolean(value);
   }
 

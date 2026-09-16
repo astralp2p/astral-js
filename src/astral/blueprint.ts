@@ -4,7 +4,7 @@
  * A node knows an object type either from a compiled-in prototype or from a
  * registered {@link Blueprint}. Registering one lets an app define its own
  * object types instead of smuggling app data as JSON inside a generic string:
- * the node then indexes objects of that type and reports the type on `get_type`.
+ * the node then indexes objects of that type and reports the type on `probe`.
  *
  * A `Blueprint` is one of two kinds, mutually exclusive:
  *   - **struct** — an ordered list of named {@link Field}s; `underlying` is unset.

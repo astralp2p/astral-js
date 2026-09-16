@@ -107,7 +107,7 @@ await tree.delete('/net/alias');
 
 const objects = new Objects(host);
 const has = await objects.contains(id); // boolean
-const type = await objects.getType(id); // string
+const probe = await objects.probe(id); // AstralObject, value { Type, Repo, Mime, Time }
 for await (const holder of await objects.find(id)) console.log(holder);
 
 // Define your own object type, then store/read instances of it.

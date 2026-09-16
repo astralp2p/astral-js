@@ -35,5 +35,6 @@ const [id] = await objects.store([
   obj('example.message', { Author: host.identity, Body: 'hello blueprint' }),
 ]);
 console.log(`stored = ${id}`);
-console.log(`type = ${await objects.getType(id)}`); // 'example.message'
+const probe = await objects.probe(id);
+console.log(`type = ${(probe.value as { Type: string }).Type}`); // 'example.message'
 console.log(`loaded = ${JSON.stringify(await objects.load(id))}`);

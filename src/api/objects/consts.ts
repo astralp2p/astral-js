@@ -4,7 +4,6 @@
 export const Ops = {
   probe: 'objects.probe',
   contains: 'objects.contains',
-  getType: 'objects.get_type',
   find: 'objects.find',
   store: 'objects.store',
   scan: 'objects.scan',

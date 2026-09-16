@@ -28,6 +28,9 @@
  *     *stream* the objects to store followed by `eos` (the bidirectional
  *     `tree.set` shape); the node replies with one `object_id.sha256` per
  *     stored object.
+ *   - {@link Objects.repositories} — query `objects.repositories` with no
+ *     arguments; the node streams one `mod.objects.repository_info` per
+ *     repository or group, returned as {@link RepositoryInfoValue}s.
  *
  * Only the BASIC operations plus `store` live here. `objects.read` returns
  * unframed raw bytes (no astral framing) and is out of scope for the
@@ -55,6 +58,8 @@ import type { Blueprint } from '../../astral/blueprint.js';
 import { BLUEPRINT_TYPE, blueprintToValue, blueprintFromValue } from '../../astral/blueprint.js';
 import { ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
 
+export { REPOSITORY_INFO_TYPE } from './consts.js';
+
 /** Options for {@link Objects.store}. */
 export interface StoreOptions {
   /** The repository to write into; the node's write-default when omitted. */
@@ -74,6 +79,45 @@ export interface ScanOptions {
    * history, without a second scan or a timer. Never called in one-shot mode.
    */
   onHistoryComplete?: () => void;
+}
+
+/**
+ * The JSON `value` of a `mod.objects.repository_info` {@link AstralObject}: one
+ * entry of the node's repository tree, either a repository or a group of them.
+ *
+ * The field names are the Go struct's exported names verbatim (astral-go
+ * `21acd1b`, `api/objects/repository_info.go`).
+ *
+ * {@link RepositoryInfoValue.Kind} tells the two apart, not
+ * {@link RepositoryInfoValue.Children}: a leaf repository and an empty group
+ * both carry an empty `Children` array.
+ */
+export interface RepositoryInfoValue {
+  /** The entry's name — the `repo` argument the other `objects.*` ops take. */
+  Name: string;
+  /** The entry's human-readable label. */
+  Label: string;
+  /**
+   * Free space in bytes. For a group, the sum of what its members report — a
+   * member reporting unknown space adds nothing, and a member that fails to
+   * report makes the whole sum `0`.
+   *
+   * PRECISION — a `uint64` on the wire, decoded as a JSON number. A value above
+   * `Number.MAX_SAFE_INTEGER` (2^53 − 1, ~9 PB) loses precision here. This
+   * follows the SDK's existing uint64 convention (`LinkInfoValue.BytesThroughput`);
+   * a caller needing exact byte counts at that scale reads the raw JSON itself.
+   */
+  Free: number;
+  /** `repository` for a single repository, `group` for a group of them. */
+  Kind: string;
+  /** The names of a group's members, in lookup order; empty for a repository. */
+  Children: string[];
+  /**
+   * How a group reads: `true` races every member and takes the first success,
+   * `false` tries them in `Children` order. Reads only — a group creates and
+   * scans the same way either way. `false` for a repository.
+   */
+  Concurrent: boolean;
 }
 
 /**
@@ -345,5 +389,28 @@ export class Objects {
     const value = await this.host.callOne(Ops.getBlueprint, { args: { type } });
     if (value == null) throw new ProtocolError('objects.get_blueprint returned no blueprint');
     return blueprintFromValue(value);
+  }
+
+  /**
+   * List the repositories the node serves.
+   *
+   * Sends `objects.repositories` (no arguments); the node streams one
+   * `mod.objects.repository_info` per entry, terminated by `eos`. Each entry's
+   * `value` is returned shaped like {@link RepositoryInfoValue}.
+   *
+   * The entries form a tree: an entry of kind `group` names its members in
+   * `Children`, and each name resolves to another entry in the same stream. An
+   * entry of kind `repository` is a leaf. `Children` alone does not separate the
+   * two — an empty group has an empty `Children` array, exactly like a leaf.
+   *
+   * An empty result is an answer, not a failure: the node replied and serves no
+   * repository. A per-entry encoding failure streams an `error_message`,
+   * surfaced as a {@link RemoteError} by {@link Host.call}.
+   *
+   * @returns One {@link RepositoryInfoValue} per repository or group.
+   */
+  async repositories(): Promise<RepositoryInfoValue[]> {
+    const objs = await this.host.call(Ops.repositories);
+    return objs.map((o) => o.value as RepositoryInfoValue);
   }
 }

@@ -10,4 +10,8 @@ export const Ops = {
   load: 'objects.load',
   registerBlueprint: 'objects.register_blueprint',
   getBlueprint: 'objects.get_blueprint',
+  repositories: 'objects.repositories',
 } as const;
+
+/** Wire type tag of an `objects.repositories` repository descriptor. */
+export const REPOSITORY_INFO_TYPE = 'mod.objects.repository_info';

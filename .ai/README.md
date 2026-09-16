@@ -58,7 +58,7 @@ same `Session` / `Transport` seam.
 - **tree** — `get(path,{follow?})` (object, or a live `Stream` with `follow`),
   `set(path, value)` (bidirectional: stream the value + eos, read ack),
   `list(path)→AsyncIterable<string>`, `delete(path,{recursive?})`.
-- **objects** — `probe(id)`, `contains(id)→boolean`, `getType(id)→string`,
+- **objects** — `probe(id)`, `contains(id)→boolean`,
   `find(id)→AsyncIterable<Identity>`,
   `store(objects,{repo?})→ObjectID[]` (bidirectional: stream the objects + eos,
   collect one id per object),

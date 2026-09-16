@@ -1,15 +1,15 @@
 // api/objects — the objects protocol client (typed object retrieval).
 // Built on the apphost WebSocket client's query. Basic ops: probe, contains,
-// getType, find. (objects.read returns unframed raw bytes — deferred with the
-// IPC transport.) Populated by: dev/api-objects.
+// find. (objects.read returns unframed raw bytes — deferred with the IPC
+// transport.) Populated by: dev/api-objects.
 
 /**
  * The `objects` protocol client: probe an object's descriptor, test local
- * availability, read its type, and find the identities that hold it.
+ * availability, and find the identities that hold it.
  *
  * A thin, typed wrapper over a {@link Host} that speaks the `objects.*`
  * operations exactly as the reference node serves them
- * (`mod/objects/client/{probe,get_type,find}.go` and
+ * (`mod/objects/client/{probe,find}.go` and
  * `mod/objects/src/op_contains.go`). Each method folds its arguments into the
  * query string via {@link Host.call} / {@link Host.callOne} / {@link Host.query}
  * (which build `objects.<op>?<args>` through the shared query-string encoder):
@@ -21,8 +21,6 @@
  *     response rejects with a {@link ProtocolError}).
  *   - {@link Objects.contains} — query `objects.contains` with `{ id }`; the node
  *     replies with one `bool`, coerced to a JS `boolean`.
- *   - {@link Objects.getType} — query `objects.get_type` with `{ id }`; the node
- *     replies with one `string8` (the object's type), returned verbatim.
  *   - {@link Objects.find} — query `objects.find` with `{ id }`; the node streams
  *     an `identity` per holder until `eos`, each decoded through
  *     {@link parseIdentity} and yielded from an async iterable.
@@ -86,8 +84,8 @@ export interface ScanOptions {
  * const host = await connect('ws://127.0.0.1:8625', { token });
  * const objects = new Objects(host);
  * const probe = await objects.probe('data1...');   // descriptor AstralObject
+ * const type = (probe.value as { Type: string }).Type; // 'mod.dir.alias_map' etc.
  * const has = await objects.contains('data1...');   // boolean
- * const type = await objects.getType('data1...');   // 'mod.dir.alias_map' etc.
  * for await (const holder of await objects.find('data1...')) {
  *   // holder: Identity
  * }
@@ -144,23 +142,6 @@ export class Objects {
   async contains(id: ObjectID | string): Promise<boolean> {
     const value = await this.host.callOne(Ops.contains, { args: { id } });
     return Boolean(value);
-  }
-
-  /**
-   * Return the type of the object `id`.
-   *
-   * Sends query `objects.get_type?id=<id>` and returns the node's single
-   * `string8` result verbatim (the object's registered type string, e.g.
-   * `mod.dir.alias_map`). A `null` reply (no result object at all) is normalized
-   * to `''`. Rejects with a {@link RemoteError} if the node reports a failure.
-   *
-   * @param id The object id whose type to read (an {@link ObjectID} or its
-   *   `data1…` string).
-   * @returns The object's type string, or `''` when the node returns none.
-   */
-  async getType(id: ObjectID | string): Promise<string> {
-    const value = await this.host.callOne(Ops.getType, { args: { id } });
-    return value == null ? '' : (value as string);
   }
 
   /**

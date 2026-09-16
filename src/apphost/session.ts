@@ -63,6 +63,23 @@ export interface Transport {
 }
 
 /**
+ * Encode one wire envelope as the text frame that carries it.
+ *
+ * A JSON channel carries one JSON envelope per **newline-terminated** line, so
+ * every frame ends with `\n`. The terminator is not decoration: astrald reads a
+ * guest socket as a byte stream, and the bytes an app writes as a responder are
+ * relayed verbatim to the caller's socket, where `wsConn.Write`
+ * (`mod/apphost/src/ws_conn.go`) re-frames them on newlines. Without the
+ * terminator the last envelope never leaves that re-framing buffer and the
+ * caller receives nothing at all. astral-go's `channel.JSONSender` ends every
+ * object the same way (`json.Encoder.Encode`), and this SDK's own
+ * {@link Receiver} already splits an inbound frame on `\n`.
+ */
+export function encodeFrame(env: unknown): string {
+  return JSON.stringify(env) + '\n';
+}
+
+/**
  * A {@link Session} over a {@link WebSocketLike} carrying `astral.json.v1`.
  * Constructed by {@link JsonWsTransport.open} once the handshake has completed.
  */
@@ -99,7 +116,7 @@ export class JsonWsSession implements Session {
   }
 
   private rawSend(env: unknown): void {
-    this.ws.send(JSON.stringify(env));
+    this.ws.send(encodeFrame(env));
   }
 }
 
@@ -137,7 +154,7 @@ export class JsonWsTransport implements Transport {
     let guestID: Identity | null = null;
     if (this.token && !skipAuth) {
       const authToken: AuthTokenMsg = { Token: this.token };
-      ws.send(JSON.stringify(wrap({ type: MessageTypes.AuthToken, value: authToken })));
+      ws.send(encodeFrame(wrap({ type: MessageTypes.AuthToken, value: authToken })));
       const resp = await receiver.next();
       if (!resp) {
         ws.close();

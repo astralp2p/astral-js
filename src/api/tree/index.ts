@@ -29,8 +29,9 @@
  *   - {@link Tree.delete} — query `tree.delete` with `{ path, recursive? }`; the
  *     node replies with a single `ack` (Go `NodeOps.Delete`).
  *
- * Only the BASIC operations live here. The node's `tree.mount_remote` /
- * `tree.unmount` operations are ADVANCED and intentionally omitted.
+ * These four are the whole tree protocol. A node mounts another `Node`
+ * implementation over a path in-process; that has no wire form, so no operation
+ * here reaches it.
  *
  * @module api/tree
  */

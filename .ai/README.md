@@ -9,7 +9,8 @@ submodule (astral-docs); this file is the map.
 A browser JavaScript client (TypeScript typings) for **astrald** over the
 **apphost WebSocket**, speaking **`astral.json.v1`**. Everything is JSON: values
 are their JSON forms (Identity = 66-hex string or `'anyone'`; ObjectID =
-`data1…` string; Nonce = 16-hex; Zone = `dvn` subset; bytes = base64). There is
+`data1…` string, or `data0…` for a partial id, which is read and never emitted;
+Nonce = 16-hex; Zone = `dvn` subset; bytes = base64). There is
 no binary codec here — a native IPC transport is a future addition behind the
 same `Session` / `Transport` seam.
 
@@ -19,8 +20,9 @@ same `Session` / `Transport` seam.
   model and the `{ Type, Object }` wire envelope (`wrap`/`unwrap`); `obj`/`ack`/
   `eos`/`error` + `isEos`/`isAck`/`isError`; `Identity`/`ObjectID`/`Nonce`/`Zone`
   string types + `parseIdentity`/`parseObjectID`; `decodeObjectID`/
-  `encodeObjectID` (a `data1…` id ↔ its 8-byte size + 32-byte sha256 digest,
-  mirroring astral-go's `ParseID`/`String`); the error hierarchy +
+  `encodeObjectID` (an id ↔ its 8-byte size + 32-byte sha256 digest, mirroring
+  astral-go's `ParseID`/`String`: both text forms decode, `data1` alone
+  encodes); the error hierarchy +
   `queryErrorForCode`; `buildQueryString` (255-byte cap). Exported at
   `astral-js/astral` and re-exported from the root.
 - `src/apphost/` — the WebSocket client, a faithful port of the astrald

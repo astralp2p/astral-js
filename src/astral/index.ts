@@ -44,6 +44,7 @@ export {
 export type { ObjectID, DecodedObjectID } from './objectid.js';
 export {
   OBJECT_ID_PREFIX,
+  PARTIAL_OBJECT_ID_PREFIX,
   isObjectID,
   parseObjectID,
   decodeObjectID,

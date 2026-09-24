@@ -16,9 +16,10 @@
  *
  *   - {@link Objects.probe} — query `objects.probe` with `{ id }`; the node
  *     replies with one descriptor object (`mod.objects.probe`, carrying `Type` /
- *     `Repo` / `Mime` / `Time`), returned as a raw {@link AstralObject} so the
- *     caller can read its `value` without this SDK imposing a schema (an empty
- *     response rejects with a {@link ProtocolError}).
+ *     `Repo` / `Mime` / `Time` / `ObjectID`), returned as a raw
+ *     {@link AstralObject} so the caller can read its `value` without this SDK
+ *     imposing a schema (an empty response rejects with a
+ *     {@link ProtocolError}).
  *   - {@link Objects.contains} — query `objects.contains` with `{ repo, id }`;
  *     the node replies with one `bool`, coerced to a JS `boolean`.
  *   - {@link Objects.find} — query `objects.find` with `{ id }`; the node streams
@@ -149,14 +150,26 @@ export class Objects {
    *
    * Sends query `objects.probe?id=<id>` and returns the node's single descriptor
    * result as a raw {@link AstralObject} (`mod.objects.probe`, whose `value`
-   * carries the object's `Type`, `Repo`, `Mime`, and probe `Time`) — returned
-   * unwrapped so the caller can read the descriptor without this SDK imposing a
-   * schema. Rejects with a {@link RemoteError} if the node cannot probe the
-   * object (its op sends an error object). The reference op replies with exactly
-   * one descriptor (Go `channel.Expect`); an empty response is a protocol
-   * violation and rejects with a {@link ProtocolError}.
+   * carries the object's `Type`, `Repo`, `Mime`, probe `Time`, and `ObjectID`)
+   * — returned unwrapped so the caller can read the descriptor without this SDK
+   * imposing a schema. Rejects with a {@link RemoteError} if the node cannot
+   * probe the object (its op sends an error object). The reference op replies
+   * with exactly one descriptor (Go `channel.Expect`); an empty response is a
+   * protocol violation and rejects with a {@link ProtocolError}.
    *
-   * @param id The object id to probe (an {@link ObjectID} or its `data1…` string).
+   * `ObjectID` is the resolved id of the object probed, and it is what makes
+   * probing by a partial id useful: the answer names the object in full, size
+   * included. Two absences are possible and they are not the same shape: a node
+   * whose `ObjectID` is unset sends the key with a JSON `null` (astral-go's
+   * `Probe` marshals the nil pointer that way, pinned by its
+   * `TestProbe_MarshalJSON_Shape`), while a node predating the field omits the
+   * key. A guard that tests only for a missing key is wrong against the first.
+   * Neither is expected from a current node — astrald sets the field on every
+   * successful probe — and because this client returns the descriptor
+   * unwrapped, both reach the caller as data rather than as a decode failure.
+   *
+   * @param id The object id to probe (an {@link ObjectID} or its `data1…`
+   *   string, or a `data0…` partial id, which the node matches by digest).
    * @returns The descriptor {@link AstralObject}.
    */
   async probe(id: ObjectID | string): Promise<AstralObject> {
@@ -183,7 +196,8 @@ export class Objects {
    * is the usual default.
    *
    * @param repo The repository to test (a `Name` from {@link Objects.repositories}).
-   * @param id The object id to test (an {@link ObjectID} or its `data1…` string).
+   * @param id The object id to test (an {@link ObjectID} or its `data1…`
+   *   string, or a `data0…` partial id, which the repository matches by digest).
    * @returns `true` if the repository holds the object, `false` otherwise.
    */
   async contains(repo: string, id: ObjectID | string): Promise<boolean> {
@@ -207,7 +221,8 @@ export class Objects {
    * caller iterates.
    *
    * @param id The object id to find holders for (an {@link ObjectID} or its
-   *   `data1…` string).
+   *   `data1…` string, or a `data0…` partial id — which the node passes to its
+   *   finders unresolved, so only a finder that matches by digest answers one).
    * @returns An async iterable of holder {@link Identity} values.
    */
   async find(id: ObjectID | string): Promise<AsyncIterable<Identity>> {
@@ -321,7 +336,8 @@ export class Objects {
    * `objects.load` is a normal typed reply, collected via {@link Host.call}; a
    * streamed `error_message` surfaces as a {@link RemoteError}.
    *
-   * @param id The object id to load.
+   * @param id The object id to load (an {@link ObjectID} or its `data1…`
+   *   string, or a `data0…` partial id, which the repository matches by digest).
    * @param opts.repo Repository to read from; the node's read-default when omitted.
    * @param opts.zone Zone filter for the read context.
    * @returns The decoded {@link AstralObject}, or `null` when the node returns none.

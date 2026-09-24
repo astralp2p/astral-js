@@ -40,7 +40,7 @@ export const ObjectTypes = {
   ErrorMessage: 'error_message',
   /** A node identity (66-hex string or `'anyone'`). */
   Identity: 'identity',
-  /** An object id (`data1…` string; decodable via `decodeObjectID`). */
+  /** An object id (`data1…`, or `data0…` for a partial id; decodable via `decodeObjectID`). */
   ObjectID: 'object_id.sha256',
   /** A 64-bit nonce (16-hex string). */
   Nonce: 'nonce64',

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, test, expect } from 'vitest';
 import {
   wrap,
@@ -149,6 +150,111 @@ describe('object id', () => {
     expect(() => decodeObjectID('data1ab0cd')).toThrow(EncodingError); // '0' is not z-base-32
     expect(() => encodeObjectID({ size: -1n, hash: new Uint8Array(32) })).toThrow(EncodingError);
     expect(() => encodeObjectID({ size: 1n, hash: new Uint8Array(31) })).toThrow(EncodingError);
+  });
+
+  // --- partial ids (`data0…`) -------------------------------------------------
+  //
+  // The vectors of .ai/system/primitive-types/object_id.sha256.md. Each is
+  // decoded alongside the data1 form of the same digest: both forms reach the
+  // same z-base-32 loop, so what the comparison pins is narrow and exact — that
+  // the 12-character pad is the only difference between them, and that the
+  // partial drops the size rather than shifting the digest.
+  const HELLO_FULL = 'data1km81js7f9cfdbauqoq3kash6f8o5naxfa878ejx8gbbuckjazgbr';
+  const HELLO_PARTIAL = 'data0ym81js7f9cfdbauqoq3kash6f8o5naxfa878ejx8gbbuckjazgbr';
+  const SIZED_FULL = 'data1rxqff36hhoddbhwbsd5c1smbpoh9oq5pgum6n6g4bg1esia4psp1r';
+  const SIZED_PARTIAL = 'data0bqff36hhoddbhwbsd5c1smbpoh9oq5pgum6n6g4bg1esia4psp1r';
+
+  test('decodes a partial id to the digest of its data1 form, with no size', () => {
+    for (const [full, partial, size] of [
+      [HELLO_FULL, HELLO_PARTIAL, 5n],
+      [SIZED_FULL, SIZED_PARTIAL, 71n],
+    ] as const) {
+      expect(decodeObjectID(full).size).toBe(size);
+      expect(decodeObjectID(partial).size).toBe(0n);
+      expect(hex(decodeObjectID(partial).hash)).toBe(hex(decodeObjectID(full).hash));
+    }
+  });
+  // The digest is computed here, not read from the document that publishes the
+  // vector, so the hello pair is corroborated rather than taken on the spec's
+  // word. Without this the vector and the assertion would have one source.
+  test("decodes the hello vector to a digest computed from 'hello'", () => {
+    const want = createHash('sha256').update('hello').digest();
+    expect(hex(decodeObjectID(HELLO_PARTIAL).hash)).toBe(hex(new Uint8Array(want)));
+  });
+  // The first body character carries the first digest bit — `y` for 0, `b` for
+  // 1 — so only those two can open a body. Both the predicate and the decoder
+  // enforce it, and the spec states it as an acceptance rule alongside width.
+  test('accepts both partial opening characters and no others', () => {
+    expect(HELLO_PARTIAL[5]).toBe('y');
+    expect(decodeObjectID(HELLO_PARTIAL).hash[0]! >> 7).toBe(0);
+    expect(SIZED_PARTIAL[5]).toBe('b');
+    expect(decodeObjectID(SIZED_PARTIAL).hash[0]! >> 7).toBe(1);
+    for (const c of ['n', 'd', '9', '1']) {
+      const bad = 'data0' + c + HELLO_PARTIAL.slice(6);
+      expect(() => decodeObjectID(bad)).toThrow(EncodingError);
+      expect(isObjectID(bad)).toBe(false);
+    }
+  });
+  // Parsing takes both forms; encoding takes one. A round trip therefore widens
+  // data0 to data1 rather than reproducing its input, which is the spec's rule
+  // that an encoder emits data1 for every id.
+  test('accepts a partial id as an input form only', () => {
+    const partial = parseObjectID(HELLO_PARTIAL);
+    expect(isObjectID(HELLO_PARTIAL)).toBe(true);
+    expect(partial).toBe(HELLO_PARTIAL);
+    expect(encodeObjectID(decodeObjectID(partial))).toBe(
+      'data1m81js7f9cfdbauqoq3kash6f8o5naxfa878ejx8gbbuckjazgbr',
+    );
+  });
+  // The empty object's own size is 0, so its full id is already partial and the
+  // two forms carry one body. Asserted against the digest, not against the other
+  // form: both forms decode through the same padded loop, so comparing them to
+  // each other would hold for any 52-character body and pin nothing.
+  test('carries one body for the empty object in both forms', () => {
+    const digest = new Uint8Array(createHash('sha256').update('').digest());
+    const empty = encodeObjectID({ size: 0n, hash: digest });
+    const body = empty.slice('data1'.length);
+    expect(body).toHaveLength(52);
+    expect(body[0]).toBe('b'); // the first digest bit of sha256('') is 1
+    const decoded = decodeObjectID('data0' + body);
+    expect(decoded.size).toBe(0n);
+    expect(hex(decoded.hash)).toBe(hex(digest));
+  });
+  // 52 zero characters decode to 40 zero bytes, which is the zero id: nothing
+  // hashes to them, so the value names no object.
+  test('decodes an all-zero partial body to the zero id', () => {
+    const zero = decodeObjectID('data0' + 'y'.repeat(52));
+    expect(zero.size).toBe(0n);
+    expect(zero.hash).toEqual(new Uint8Array(32));
+  });
+  // The width is exact, not a maximum: a short body is a different digest
+  // rather than a smaller number, so padding one would invent an id.
+  test('requires a partial body of exactly 52 characters', () => {
+    const body = HELLO_PARTIAL.slice(5);
+    for (const bad of ['', body.slice(0, 51), body + 'y', body.slice(0, 26)]) {
+      expect(() => decodeObjectID('data0' + bad)).toThrow(EncodingError);
+      expect(isObjectID('data0' + bad)).toBe(false);
+    }
+  });
+  // The alphabet is the one divergence left between the predicate and the
+  // decoder, and it is the same for both forms: right width, wrong characters.
+  test('rejects partial characters outside the alphabet', () => {
+    const body = HELLO_PARTIAL.slice(5);
+    for (const bad of [
+      'y' + body.slice(1).toUpperCase(),
+      'y' + 'l'.repeat(51),
+      'y' + '0'.repeat(51),
+    ]) {
+      expect(() => decodeObjectID('data0' + bad)).toThrow(EncodingError);
+      expect(isObjectID('data0' + bad)).toBe(true); // shape passes; the decode is what rejects
+    }
+  });
+  // The data0 branch is additive: data1 keeps its trimmed, variable body.
+  test('leaves the data1 form unchanged', () => {
+    expect(decodeObjectID('data1').size).toBe(0n);
+    expect(isObjectID('data1abcdef')).toBe(true);
+    expect(() => decodeObjectID('data1' + 'y'.repeat(65))).toThrow(EncodingError);
+    expect(isObjectID('data2' + 'y'.repeat(52))).toBe(false);
   });
 });
 

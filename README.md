@@ -174,7 +174,7 @@ astral-js/api/tree   → Tree
 astral-js/api/objects→ Objects
 astral-js/api/user   → User      (swarm membership)
 astral-js/api/auth   → Auth      (permission contracts)
-astral-js/api/services→ Services (service discovery)
+astral-js/api/services→ Services (advertise and discover services)
 ```
 
 The three layers mirror astral-go's `astral` / `lib/apphost` / `api/<p>` split:

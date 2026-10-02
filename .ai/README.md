@@ -77,7 +77,8 @@ same `Session` / `Transport` seam.
 - **services** — provider: `advertise(handlers)→Binding` (`{ [service]: (caller) => Offering | null }`;
   `change(...callers)`, `changeAll()`, `close()`, `done`); consumer: `discover(names, follow?)→DiscoveryStream`
   of `update` / `removed` / `initial` events, and `watch(names)→Watcher` (`offerings()`, `initial`,
-  `onChange`, `done`, `close`). Names travel as one comma-separated `services` argument. No
+  `onChange`, `done`, `close`). `{ reach: 'swarm' }` on discover/watch carries the discovery to the
+  node's swarm. Names travel as one comma-separated `services` argument. No
   re-advertise after a disconnect: the app opens a new binding.
 - **nearby** — LAN discovery: `broadcast()`, `list()→AstralObject[]` of
   `mod.nearby.status` (alias travels inside the `Attachments` bundle).

@@ -1,7 +1,7 @@
 // api/services/watch — follow a discovery and keep the current offerings.
 
 import type { Host } from '../../apphost/host.js';
-import { discover, type DiscoveryStream } from './discover.js';
+import { discover, type DiscoverOptions, type DiscoveryStream } from './discover.js';
 import {
   offeringKey,
   type DiscoveryEvent,
@@ -19,8 +19,9 @@ export class Watcher {
   private readonly events: DiscoveryStream;
   private closed = false;
   private resolveInitial!: (o: InitialOutcome) => void;
+  private rejectInitial!: (err: unknown) => void;
 
-  /** Resolves with the initial outcome. Never settles if the stream fails first. */
+  /** Resolves with the initial outcome; rejects if the stream ends first. */
   readonly initial: Promise<InitialOutcome>;
   /** Resolves when the watcher is closed; rejects with the error that ended it. */
   readonly done: Promise<void>;
@@ -28,7 +29,13 @@ export class Watcher {
   /** @internal */
   constructor(events: DiscoveryStream) {
     this.events = events;
-    this.initial = new Promise((resolve) => (this.resolveInitial = resolve));
+    this.initial = new Promise((resolve, reject) => {
+      this.resolveInitial = resolve;
+      this.rejectInitial = reject;
+    });
+    // why: an app that only listens to onChange never awaits initial; its
+    // rejection must not surface as unhandled.
+    this.initial.catch(() => {});
     this.done = this.run();
   }
 
@@ -70,12 +77,18 @@ export class Watcher {
     try {
       for await (const ev of this.events) this.apply(ev);
     } catch (err) {
+      this.rejectInitial(err);
       if (!this.closed) throw err;
     }
+    this.rejectInitial(new Error('discovery closed'));
   }
 }
 
-/** Follow `names` on the host's node. */
-export async function watch(host: Host, names: readonly string[]): Promise<Watcher> {
-  return new Watcher(await discover(host, names, true));
+/** Follow `names` on the host's node, or across its swarm with `reach: 'swarm'`. */
+export async function watch(
+  host: Host,
+  names: readonly string[],
+  opts: DiscoverOptions = {},
+): Promise<Watcher> {
+  return new Watcher(await discover(host, names, true, opts));
 }

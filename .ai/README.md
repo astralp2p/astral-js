@@ -74,7 +74,11 @@ same `Session` / `Transport` seam.
   `swarmStatus()→SwarmMemberValue[]` (member tag is the plural
   `mod.users.swarm_member`).
 - **auth** — permission contracts: `signContract(contract)`, `index(objectID)`.
-- **services** — `discover(follow?)→AsyncIterable` of `services.update`.
+- **services** — provider: `advertise(handlers)→Binding` (`{ [service]: (caller) => Offering | null }`;
+  `change(...callers)`, `changeAll()`, `close()`, `done`); consumer: `discover(names, follow?)→DiscoveryStream`
+  of `update` / `removed` / `initial` events, and `watch(names)→Watcher` (`offerings()`, `initial`,
+  `onChange`, `done`, `close`). Names travel as one comma-separated `services` argument. No
+  re-advertise after a disconnect: the app opens a new binding.
 - **nearby** — LAN discovery: `broadcast()`, `list()→AstralObject[]` of
   `mod.nearby.status` (alias travels inside the `Attachments` bundle).
 - **nodes** — links and endpoints: `links()→AstralObject[]` of

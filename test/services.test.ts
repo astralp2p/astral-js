@@ -135,7 +135,35 @@ describe('Services.discover', () => {
   });
 });
 
+describe('Services reach', () => {
+  it('sends reach=swarm only when asked', async () => {
+    const local = scripted(eos);
+    await collect(await local.services.discover(['player']));
+    expect(local.session.query).toBe('services.discover?services=player');
+
+    const swarm = scripted(eos);
+    await collect(await swarm.services.discover(['player'], false, { reach: 'swarm' }));
+    expect(swarm.session.query).toBe('services.discover?services=player&reach=swarm');
+  });
+
+  it('watches across the swarm', async () => {
+    const { session, services } = scripted(eos);
+    const w = await services.watch(['player'], { reach: 'swarm' });
+    await w.initial;
+    expect(session.query).toBe('services.discover?services=player&follow=true&reach=swarm');
+    w.close();
+    await w.done;
+  });
+});
+
 describe('Services.watch', () => {
+  it('rejects initial when the stream fails first', async () => {
+    const { services } = scripted({ type: 'error_message', value: 'not permitted' });
+    const w = await services.watch(['player']);
+    await expect(w.initial).rejects.toBeInstanceOf(RemoteError);
+    await expect(w.done).rejects.toBeInstanceOf(RemoteError);
+  });
+
   it('keeps the available offerings', async () => {
     const { session, services } = scripted(update('player'), eos);
     const w = await services.watch(['player']);

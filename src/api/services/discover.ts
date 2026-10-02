@@ -25,6 +25,19 @@ export class StreamEnded extends AstralError {
  */
 export type DiscoveryStream = AsyncIterable<DiscoveryEvent> & { close(): void };
 
+/** Options for {@link discover} and {@link watch}. */
+export interface DiscoverOptions {
+  /**
+   * `local` (the default) discovers the providers the host's node hosts;
+   * `swarm` makes the node carry the discovery to every member of its swarm,
+   * in this app's name.
+   */
+  reach?: Reach;
+}
+
+/** Which nodes a discovery covers. */
+export type Reach = 'local' | 'swarm';
+
 /**
  * Discover `names` for this app on the host's node.
  *
@@ -37,9 +50,14 @@ export async function discover(
   host: Host,
   names: readonly string[],
   follow = false,
+  opts: DiscoverOptions = {},
 ): Promise<DiscoveryStream> {
   const stream = await host.query(Ops.discover, {
-    args: { services: joinNames(names), follow: follow ? true : undefined },
+    args: {
+      services: joinNames(names),
+      follow: follow ? true : undefined,
+      reach: opts.reach === 'swarm' ? 'swarm' : undefined,
+    },
   });
   return {
     [Symbol.asyncIterator]: () => readDiscovery(stream, follow),

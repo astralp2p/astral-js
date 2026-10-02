@@ -4,7 +4,7 @@
 
 import type { Host } from '../../apphost/host.js';
 import { advertise, type Binding, type OfferingHandler } from './advertise.js';
-import { discover, type DiscoveryStream } from './discover.js';
+import { discover, type DiscoverOptions, type DiscoveryStream } from './discover.js';
 import { watch, type Watcher } from './watch.js';
 
 export { Ops, Types, UPDATE_TYPE, MAX_NAMES } from './consts.js';
@@ -17,7 +17,13 @@ export type {
   OfferingKeyValue,
   ServiceUpdateValue,
 } from './types.js';
-export { discover, StreamEnded, type DiscoveryStream } from './discover.js';
+export {
+  discover,
+  StreamEnded,
+  type DiscoverOptions,
+  type DiscoveryStream,
+  type Reach,
+} from './discover.js';
 export { advertise, Binding, type Offering, type OfferingHandler } from './advertise.js';
 export { watch, Watcher } from './watch.js';
 
@@ -50,12 +56,16 @@ export class Services {
   }
 
   /** See {@link discover}. */
-  discover(names: readonly string[], follow = false): Promise<DiscoveryStream> {
-    return discover(this.host, names, follow);
+  discover(
+    names: readonly string[],
+    follow = false,
+    opts: DiscoverOptions = {},
+  ): Promise<DiscoveryStream> {
+    return discover(this.host, names, follow, opts);
   }
 
   /** See {@link watch}. */
-  watch(names: readonly string[]): Promise<Watcher> {
-    return watch(this.host, names);
+  watch(names: readonly string[], opts: DiscoverOptions = {}): Promise<Watcher> {
+    return watch(this.host, names, opts);
   }
 }

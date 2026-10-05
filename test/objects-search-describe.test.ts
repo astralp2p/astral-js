@@ -216,3 +216,57 @@ describe('Objects.describe', () => {
     await expect(collect(await objectsOn(transport).describe(ID1))).rejects.toThrow();
   });
 });
+
+/** Accepts the query, plays `replies`, then holds `recv` open until the session closes. */
+function hangingTransport(replies: AstralObject[]) {
+  let closed = 0;
+  let release: ((o: AstralObject | null) => void) | undefined;
+
+  const transport: Transport = {
+    async open(): Promise<Session> {
+      const queue: AstralObject[] = [{ type: MessageTypes.QueryAccepted, value: {} }, ...replies];
+      return {
+        hostInfo: { identity: NODE, alias: 'node' },
+        guestID: GUEST,
+        send() {},
+        recv(): Promise<AstralObject | null> {
+          const o = queue.shift();
+          if (o) return Promise.resolve(o);
+          if (closed) return Promise.resolve(null);
+          return new Promise((r) => (release = r));
+        },
+        close() {
+          closed++;
+          release?.(null);
+        },
+      } as unknown as Session;
+    },
+  };
+
+  return { transport, closes: () => closed };
+}
+
+describe('abort signal', () => {
+  it('ends a search waiting on the next match', async () => {
+    const { transport, closes } = hangingTransport([searchResult(ID1)]);
+    const ctl = new AbortController();
+    const seen: string[] = [];
+    for await (const r of await objectsOn(transport).search('x', { signal: ctl.signal })) {
+      seen.push(r.ObjectID);
+      setTimeout(() => ctl.abort(), 0); // abort while the loop waits on the next frame
+    }
+    expect(seen).toEqual([ID1]);
+    expect(closes()).toBeGreaterThanOrEqual(1);
+  });
+
+  it('closes a describe aborted before iteration starts', async () => {
+    const { transport, closes } = hangingTransport([
+      describeResult({ Type: 'string8', Object: 'a' }),
+    ]);
+    const ctl = new AbortController();
+    const results = await objectsOn(transport).describe(ID1, { signal: ctl.signal });
+    ctl.abort();
+    expect(await collect(results)).toEqual([]);
+    expect(closes()).toBeGreaterThanOrEqual(1);
+  });
+});

@@ -99,6 +99,8 @@ export interface SearchOptions {
   repo?: string;
   /** Zone filter for the search context; the node searches all zones when omitted. */
   zone?: Zone;
+  /** Closes the query when aborted; iteration then ends without an error. */
+  signal?: AbortSignal;
 }
 
 /** Options for {@link Objects.describe}. */
@@ -109,6 +111,8 @@ export interface DescribeOptions {
   except?: string[];
   /** Zone filter for describer lookups; the node uses all zones when omitted. */
   zone?: Zone;
+  /** Closes the query when aborted; iteration then ends without an error. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -184,16 +188,27 @@ function parseDescribeResult(o: AstralObject): DescribeResultValue {
  * Wrap a query stream as an async iterable of parsed values: a streamed
  * `error_message` throws a {@link RemoteError}, `eos` ends iteration, and the
  * stream closes however iteration stops (end, error, or an early `break`).
+ * Aborting `signal` closes the stream at once, so a pending read resolves and
+ * iteration ends without an error; a `break` alone waits for the next frame.
  */
-function iterate<T>(stream: Stream, parse: (o: AstralObject) => T): AsyncIterable<T> {
+function iterate<T>(
+  stream: Stream,
+  parse: (o: AstralObject) => T,
+  signal?: AbortSignal,
+): AsyncIterable<T> {
+  const close = () => stream.close();
+  if (signal?.aborted) close();
+  else signal?.addEventListener('abort', close, { once: true });
   return {
     async *[Symbol.asyncIterator](): AsyncGenerator<T, void, undefined> {
       try {
         for await (const o of stream) {
+          if (signal?.aborted) return;
           if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
           yield parse(o);
         }
       } finally {
+        signal?.removeEventListener('abort', close);
         stream.close();
       }
     },
@@ -543,7 +558,8 @@ export class Objects {
    * The caller must hold `mod.auth.see_objects_action`; a refused query rejects
    * this call before iteration. An unknown `repo` or a search that fails to
    * start streams an `error_message`, thrown as a {@link RemoteError} from the
-   * iteration. Breaking out of the loop closes the query.
+   * iteration. Breaking out of the loop closes the query; aborting
+   * `opts.signal` closes it without waiting for the next match.
    *
    * @param query The search query.
    * @param opts See {@link SearchOptions}.
@@ -553,7 +569,7 @@ export class Objects {
     const stream = await this.host.query(Ops.search, {
       args: { q: query, repo: opts.repo, zone: opts.zone },
     });
-    return iterate(stream, parseSearchResult);
+    return iterate(stream, parseSearchResult, opts.signal);
   }
 
   /**
@@ -568,7 +584,8 @@ export class Objects {
    * The caller must hold `mod.auth.see_objects_action`; a refused query rejects
    * this call before iteration. A streamed `error_message` is thrown as a
    * {@link RemoteError} from the iteration. Breaking out of the loop closes the
-   * query.
+   * query; aborting `opts.signal` closes it without waiting for the next
+   * descriptor.
    *
    * @param id The object id to describe (an {@link ObjectID} or its `data1…`
    *   string, or a `data0…` partial id, passed to every describer as given).
@@ -587,7 +604,7 @@ export class Objects {
         zone: opts.zone,
       },
     });
-    return iterate(stream, parseDescribeResult);
+    return iterate(stream, parseDescribeResult, opts.signal);
   }
 
   /**

@@ -108,7 +108,7 @@ signing/exchange choreography before being treated as frozen.
 - Deferred: native IPC (binary unix/tcp) transport, `objects.read` (raw
   unframed bytes — not representable over JSON), the advanced protocol ops
   (`dir.apply_filters`/`alias_map`, `tree.mount`,
-  `objects` describe/search and the write ops beyond `store`/blueprint
+  the `objects` write ops beyond `store`/blueprint
   registration, the `apphost` token-management ops).
 - **Needs live-node confirmation** (flagged in the source JSDoc): `crypto.public_key`
   and `crypto.verify_text_signature` (the Go ops read a _streamed_ key/signature

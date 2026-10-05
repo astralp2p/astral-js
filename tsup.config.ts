@@ -5,6 +5,12 @@ import { defineConfig } from 'tsup';
 // consumers get full type hints on both `import` and `require`. The apphost
 // WebSocket client is bundled into the root entry (not its own subpath); `ws`
 // stays external so browser bundles never pull it in.
+//
+// Code splitting puts modules shared between entries (the error classes in
+// particular) into chunks every entry imports, in both ESM and CJS. Without it
+// each entry bundled its own copy, so an error thrown from
+// `astral-js/api/services` failed `instanceof` against the class imported from
+// `astral-js` (test/dist-errors.test.ts).
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
@@ -24,7 +30,7 @@ export default defineConfig({
   },
   format: ['esm', 'cjs'],
   dts: true,
-  splitting: false,
+  splitting: true,
   sourcemap: true,
   clean: true,
   treeshake: true,

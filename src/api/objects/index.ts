@@ -32,11 +32,18 @@
  *   - {@link Objects.repositories} — query `objects.repositories` with no
  *     arguments; the node streams one `mod.objects.repository_info` per
  *     repository or group, returned as {@link RepositoryInfoValue}s.
+ *   - {@link Objects.search} — query `objects.search` with `{ q, repo?, zone? }`;
+ *     the node streams one `mod.objects.search_result` per match until `eos`,
+ *     yielded as {@link SearchResultValue}s from an async iterable.
+ *   - {@link Objects.describe} — query `objects.describe` with
+ *     `{ id, only?, except?, zone? }`; the node streams one
+ *     `mod.objects.describe_result` per descriptor until `eos`, yielded as
+ *     {@link DescribeResultValue}s from an async iterable.
  *
- * Only the BASIC operations plus `store` live here. `objects.read` returns
- * unframed raw bytes (no astral framing) and is out of scope for the
- * `astral.json.v1` transport; the `describe` / `search` and the remaining write
- * (create/delete/push/…) operations are ADVANCED and intentionally omitted.
+ * `objects.read` returns unframed raw bytes (no astral framing) and is out of
+ * scope for the `astral.json.v1` transport. The remaining write
+ * (create/delete/push/…) and registration (`register_searcher`,
+ * `register_describer`, …) operations are omitted.
  *
  * `repo` follows what astrald requires of each op, not a uniform SDK choice:
  * `objects.probe` leaves `Repo` optional and {@link Objects.probe} omits it,
@@ -48,9 +55,10 @@
  */
 
 import type { Host } from '../../apphost/host.js';
+import type { Stream } from '../../apphost/stream.js';
 import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
-import { obj, eos, isEos, isError } from '../../astral/object.js';
+import { obj, eos, isEos, isError, unwrap } from '../../astral/object.js';
 import type { Zone } from '../../astral/zone.js';
 import type { Identity } from '../../astral/identity.js';
 import { parseIdentity, isAnyone } from '../../astral/identity.js';
@@ -59,8 +67,10 @@ import { parseObjectID } from '../../astral/objectid.js';
 import type { Blueprint } from '../../astral/blueprint.js';
 import { BLUEPRINT_TYPE, blueprintToValue, blueprintFromValue } from '../../astral/blueprint.js';
 import { ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
+import { readEnvelope } from '../../astral/envelope.js';
+import { SEARCH_RESULT_TYPE, DESCRIBE_RESULT_TYPE } from './consts.js';
 
-export { REPOSITORY_INFO_TYPE } from './consts.js';
+export { REPOSITORY_INFO_TYPE, SEARCH_RESULT_TYPE, DESCRIBE_RESULT_TYPE } from './consts.js';
 
 /** Options for {@link Objects.store}. */
 export interface StoreOptions {
@@ -81,6 +91,113 @@ export interface ScanOptions {
    * history, without a second scan or a timer. Never called in one-shot mode.
    */
   onHistoryComplete?: () => void;
+}
+
+/** Options for {@link Objects.search}. */
+export interface SearchOptions {
+  /** Return only matches whose objects exist in this repository. */
+  repo?: string;
+  /** Zone filter for the search context; the node searches all zones when omitted. */
+  zone?: Zone;
+}
+
+/** Options for {@link Objects.describe}. */
+export interface DescribeOptions {
+  /** Descriptor object types to include; every type when omitted. */
+  only?: string[];
+  /** Descriptor object types to exclude. */
+  except?: string[];
+  /** Zone filter for describer lookups; the node uses all zones when omitted. */
+  zone?: Zone;
+}
+
+/**
+ * One `objects.search` match: a `mod.objects.search_result`. Field names are the
+ * Go struct's exported names (astral-docs `protocols/objects/types/mod.objects.search_result.md`).
+ */
+export interface SearchResultValue {
+  /** The identity of the searcher that produced the match. */
+  SourceID: Identity;
+  /** The id of the matching object. */
+  ObjectID: ObjectID;
+}
+
+/**
+ * One `objects.describe` descriptor: a `mod.objects.describe_result`. Field
+ * names are the Go struct's exported names (astral-docs
+ * `protocols/objects/types/mod.objects.describe_result.md`).
+ */
+export interface DescribeResultValue {
+  /** The identity of the describer that produced the descriptor. */
+  SourceID: Identity;
+  /** The id of the described object. */
+  ObjectID: ObjectID;
+  /**
+   * The descriptor itself, any astral object type, e.g. `mod.fs.file_location`.
+   * Returned as a raw {@link AstralObject}; this SDK imposes no schema on it.
+   */
+  Data: AstralObject;
+}
+
+/** Read a field of a result value, rejecting a non-object value. */
+function fields(o: AstralObject): Record<string, unknown> {
+  const v = o.value;
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) {
+    throw new ProtocolError(`${o.type}: value is not an object`);
+  }
+  return v as Record<string, unknown>;
+}
+
+/** Parse a `SourceID` / `ObjectID` pair, rethrowing a malformed one as a {@link ProtocolError}. */
+function parseIDs(
+  o: AstralObject,
+  v: Record<string, unknown>,
+): { SourceID: Identity; ObjectID: ObjectID } {
+  try {
+    return {
+      SourceID: parseIdentity(v.SourceID as string),
+      ObjectID: parseObjectID(v.ObjectID as string),
+    };
+  } catch (err) {
+    throw new ProtocolError(`${o.type}: ${(err as Error).message}`);
+  }
+}
+
+/** Parse one streamed `mod.objects.search_result`. */
+function parseSearchResult(o: AstralObject): SearchResultValue {
+  if (o.type !== SEARCH_RESULT_TYPE) {
+    throw new ProtocolError(`objects.search: unexpected object type ${JSON.stringify(o.type)}`);
+  }
+  return parseIDs(o, fields(o));
+}
+
+/** Parse one streamed `mod.objects.describe_result`. */
+function parseDescribeResult(o: AstralObject): DescribeResultValue {
+  if (o.type !== DESCRIBE_RESULT_TYPE) {
+    throw new ProtocolError(`objects.describe: unexpected object type ${JSON.stringify(o.type)}`);
+  }
+  const v = fields(o);
+  return { ...parseIDs(o, v), Data: unwrap(readEnvelope(v.Data, `${o.type} Data`)) };
+}
+
+/**
+ * Wrap a query stream as an async iterable of parsed values: a streamed
+ * `error_message` throws a {@link RemoteError}, `eos` ends iteration, and the
+ * stream closes however iteration stops (end, error, or an early `break`).
+ */
+function iterate<T>(stream: Stream, parse: (o: AstralObject) => T): AsyncIterable<T> {
+  return {
+    async *[Symbol.asyncIterator](): AsyncGenerator<T, void, undefined> {
+      try {
+        for await (const o of stream) {
+          if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
+          yield parse(o);
+        }
+      } finally {
+        stream.close();
+      }
+    },
+  };
 }
 
 /**
@@ -408,6 +525,69 @@ export class Objects {
     const value = await this.host.callOne(Ops.getBlueprint, { args: { type } });
     if (value == null) throw new ProtocolError('objects.get_blueprint returned no blueprint');
     return blueprintFromValue(value);
+  }
+
+  /**
+   * Search the node's searchers and yield each match as it arrives.
+   *
+   * Sends `objects.search?q=<query>` (with `repo` / `zone` when given) and
+   * yields one {@link SearchResultValue} per streamed
+   * `mod.objects.search_result`, ending at the node's `eos`. The node
+   * deduplicates matches by `ObjectID` and caps the search at one minute.
+   *
+   * `query` follows the `objects.search_query` grammar: bare words plus
+   * `tag:value`, `-tag:value` (exclude), `?tag:value` (optional) and
+   * `~tag:value`; a value with spaces is quoted, `artist:"Miles Davis"`. Which
+   * tags a searcher honours is the searcher's choice.
+   *
+   * The caller must hold `mod.auth.see_objects_action`; a refused query rejects
+   * this call before iteration. An unknown `repo` or a search that fails to
+   * start streams an `error_message`, thrown as a {@link RemoteError} from the
+   * iteration. Breaking out of the loop closes the query.
+   *
+   * @param query The search query.
+   * @param opts See {@link SearchOptions}.
+   * @returns An async iterable of matches.
+   */
+  async search(query: string, opts: SearchOptions = {}): Promise<AsyncIterable<SearchResultValue>> {
+    const stream = await this.host.query(Ops.search, {
+      args: { q: query, repo: opts.repo, zone: opts.zone },
+    });
+    return iterate(stream, parseSearchResult);
+  }
+
+  /**
+   * Collect the descriptors of the object `id` and yield each as it arrives.
+   *
+   * Sends `objects.describe?id=<id>` (with `only` / `except` as comma-separated
+   * type lists and `zone` when given) and yields one {@link DescribeResultValue}
+   * per streamed `mod.objects.describe_result`, ending at the node's `eos`. An
+   * object no describer knows yields nothing. The node caps the call at one
+   * minute.
+   *
+   * The caller must hold `mod.auth.see_objects_action`; a refused query rejects
+   * this call before iteration. A streamed `error_message` is thrown as a
+   * {@link RemoteError} from the iteration. Breaking out of the loop closes the
+   * query.
+   *
+   * @param id The object id to describe (an {@link ObjectID} or its `data1…`
+   *   string, or a `data0…` partial id, passed to every describer as given).
+   * @param opts See {@link DescribeOptions}.
+   * @returns An async iterable of descriptors.
+   */
+  async describe(
+    id: ObjectID | string,
+    opts: DescribeOptions = {},
+  ): Promise<AsyncIterable<DescribeResultValue>> {
+    const stream = await this.host.query(Ops.describe, {
+      args: {
+        id,
+        only: opts.only?.length ? opts.only.join(',') : undefined,
+        except: opts.except?.length ? opts.except.join(',') : undefined,
+        zone: opts.zone,
+      },
+    });
+    return iterate(stream, parseDescribeResult);
   }
 
   /**

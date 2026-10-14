@@ -32,13 +32,14 @@
  *   - {@link Objects.repositories} — query `objects.repositories` with no
  *     arguments; the node streams one `mod.objects.repository_info` per
  *     repository or group, returned as {@link RepositoryInfoValue}s.
- *   - {@link Objects.search} — query `objects.search` with `{ q, repo?, zone? }`;
- *     the node streams one `mod.objects.search_result` per match until `eos`,
- *     yielded as {@link SearchResultValue}s from an async iterable.
+ *   - {@link Objects.search} — query `objects.search` with
+ *     `{ q, repo?, zone?, sources?, sources_only? }`; the node streams one
+ *     `mod.objects.search_result` per match until `eos`, yielded as
+ *     {@link SearchResultValue}s from an async iterable.
  *   - {@link Objects.describe} — query `objects.describe` with
- *     `{ id, only?, except?, zone? }`; the node streams one
- *     `mod.objects.describe_result` per descriptor until `eos`, yielded as
- *     {@link DescribeResultValue}s from an async iterable.
+ *     `{ id, only?, except?, zone?, sources?, sources_only? }`; the node
+ *     streams one `mod.objects.describe_result` per descriptor until `eos`,
+ *     yielded as {@link DescribeResultValue}s from an async iterable.
  *
  * `objects.read` returns unframed raw bytes (no astral framing) and is out of
  * scope for the `astral.json.v1` transport. The remaining write
@@ -97,8 +98,12 @@ export interface ScanOptions {
 export interface SearchOptions {
   /** Return only matches whose objects exist in this repository. */
   repo?: string;
-  /** Zone filter for the search context; the node searches all zones when omitted. */
+  /** Limits the query's routing zone and never widens it; the routing zone stands when omitted. */
   zone?: Zone;
+  /** Identities to ask in addition to the node's own searchers; aliases resolve on the node. */
+  sources?: (Identity | string)[];
+  /** Ask only `sources`, skipping the node's own searchers. */
+  sourcesOnly?: boolean;
   /** Closes the query when aborted; iteration then ends without an error. */
   signal?: AbortSignal;
 }
@@ -109,8 +114,12 @@ export interface DescribeOptions {
   only?: string[];
   /** Descriptor object types to exclude. */
   except?: string[];
-  /** Zone filter for describer lookups; the node uses all zones when omitted. */
+  /** Limits the query's routing zone and never widens it; the routing zone stands when omitted. */
   zone?: Zone;
+  /** Identities to ask in addition to the node's own describers; aliases resolve on the node. */
+  sources?: (Identity | string)[];
+  /** Ask only `sources`, skipping the node's own describers. */
+  sourcesOnly?: boolean;
   /** Closes the query when aborted; iteration then ends without an error. */
   signal?: AbortSignal;
 }
@@ -545,8 +554,9 @@ export class Objects {
   /**
    * Search the node's searchers and yield each match as it arrives.
    *
-   * Sends `objects.search?q=<query>` (with `repo` / `zone` when given) and
-   * yields one {@link SearchResultValue} per streamed
+   * Sends `objects.search?q=<query>` (with `repo` / `zone` and `sources` as a
+   * comma-separated identity list when given, and `sources_only` when true)
+   * and yields one {@link SearchResultValue} per streamed
    * `mod.objects.search_result`, ending at the node's `eos`. The node
    * deduplicates matches by `ObjectID` and caps the search at one minute.
    *
@@ -567,7 +577,13 @@ export class Objects {
    */
   async search(query: string, opts: SearchOptions = {}): Promise<AsyncIterable<SearchResultValue>> {
     const stream = await this.host.query(Ops.search, {
-      args: { q: query, repo: opts.repo, zone: opts.zone },
+      args: {
+        q: query,
+        repo: opts.repo,
+        zone: opts.zone,
+        sources: opts.sources?.length ? opts.sources.join(',') : undefined,
+        sources_only: opts.sourcesOnly ? true : undefined,
+      },
     });
     return iterate(stream, parseSearchResult, opts.signal);
   }
@@ -576,7 +592,8 @@ export class Objects {
    * Collect the descriptors of the object `id` and yield each as it arrives.
    *
    * Sends `objects.describe?id=<id>` (with `only` / `except` as comma-separated
-   * type lists and `zone` when given) and yields one {@link DescribeResultValue}
+   * type lists, `zone` and `sources` as a comma-separated identity list when
+   * given, and `sources_only` when true) and yields one {@link DescribeResultValue}
    * per streamed `mod.objects.describe_result`, ending at the node's `eos`. An
    * object no describer knows yields nothing. The node caps the call at one
    * minute.
@@ -602,6 +619,8 @@ export class Objects {
         only: opts.only?.length ? opts.only.join(',') : undefined,
         except: opts.except?.length ? opts.except.join(',') : undefined,
         zone: opts.zone,
+        sources: opts.sources?.length ? opts.sources.join(',') : undefined,
+        sources_only: opts.sourcesOnly ? true : undefined,
       },
     });
     return iterate(stream, parseDescribeResult, opts.signal);

@@ -95,6 +95,19 @@ describe('Objects.search', () => {
     expect(routed[0]!.Query).toBe('objects.search?q=hello');
   });
 
+  it('sends sources joined by commas, and sources_only only when true', async () => {
+    const { transport, routed } = recordingTransport([EOS]);
+    const objects = objectsOn(transport);
+    await collect(await objects.search('x', { sources: [NODE, SOURCE], sourcesOnly: true }));
+    await collect(await objects.search('x', { sources: [SOURCE], sourcesOnly: false }));
+    await collect(await objects.search('x', { sources: [] }));
+    expect(routed.map((r) => r.Query)).toEqual([
+      `objects.search?q=x&sources=${NODE}%2C${SOURCE}&sources_only=true`,
+      `objects.search?q=x&sources=${SOURCE}`,
+      'objects.search?q=x',
+    ]);
+  });
+
   it('throws a RemoteError on error_message and closes the stream', async () => {
     const { transport, closes } = recordingTransport([
       searchResult(ID1),
@@ -183,6 +196,19 @@ describe('Objects.describe', () => {
       await collect(await objectsOn(transport).describe(ID1, { only: [], except: [] })),
     ).toEqual([]);
     expect(routed[0]!.Query).toBe(`objects.describe?id=${ID1}`);
+  });
+
+  it('sends sources joined by commas, and sources_only only when true', async () => {
+    const { transport, routed } = recordingTransport([EOS]);
+    const objects = objectsOn(transport);
+    await collect(await objects.describe(ID1, { sources: [NODE, SOURCE], sourcesOnly: true }));
+    await collect(await objects.describe(ID1, { sources: [SOURCE], sourcesOnly: false }));
+    await collect(await objects.describe(ID1, { sources: [] }));
+    expect(routed.map((r) => r.Query)).toEqual([
+      `objects.describe?id=${ID1}&sources=${NODE}%2C${SOURCE}&sources_only=true`,
+      `objects.describe?id=${ID1}&sources=${SOURCE}`,
+      `objects.describe?id=${ID1}`,
+    ]);
   });
 
   it('throws a RemoteError on error_message', async () => {

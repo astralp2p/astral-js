@@ -440,9 +440,10 @@ export class User {
    * The node derives the user's key from the words along `m/1791'/0'/0'/0/0`,
    * signs the claim contract as the user and as itself, stores the user's key,
    * and activates the contract. The reply is a `mod.user.bootstrap_result`,
-   * returned as its {@link BootstrapResultValue}. Omitted or empty `words` asks
-   * the node to generate 24 words; the reply's `Mnemonic` then carries them and
-   * is the only copy anywhere. With `words` given, `Mnemonic` is empty.
+   * returned as its {@link BootstrapResultValue}. Omitted `words` asks the node
+   * to generate 24 words; the reply's `Mnemonic` then carries them and is the
+   * only copy anywhere. With `words` given, `Mnemonic` is empty. Empty or blank
+   * `words` throw a `TypeError` before any query is sent.
    *
    * WIRE — `words` travel in the stream as one `string16` followed by `eos`,
    * never in the query string: a query string is logged, the stream is not.
@@ -467,13 +468,18 @@ export class User {
    * {@link ProtocolError}.
    *
    * @param words The BIP-39 words, separated by whitespace; the node generates
-   *   24 words when omitted or empty.
+   *   24 words when omitted.
    * @param opts.passphrase The BIP-39 passphrase of the seed.
    * @returns The {@link BootstrapResultValue}: the user's identity and, when
    *   the node generated them, the words.
    */
   async bootstrap(words?: string, opts: BootstrapOptions = {}): Promise<BootstrapResultValue> {
-    const generate = !words;
+    // why: an empty form field must not claim the node with words the caller
+    // never sees; generating is asked for by omitting the words.
+    if (words !== undefined && words.trim() === '') {
+      throw new TypeError('user.bootstrap: words are empty; omit them to generate new words');
+    }
+    const generate = words === undefined;
     const stream = await this.host.query(Ops.bootstrap, {
       args: {
         generate: generate ? true : undefined,

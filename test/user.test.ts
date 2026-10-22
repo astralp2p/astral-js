@@ -127,13 +127,13 @@ describe('User.bootstrap', () => {
     expect(reply).toEqual({ Identity: USER, Mnemonic: WORDS });
   });
 
-  it('treats empty words as no words', async () => {
-    const { transport, routed, streamed } = recordingTransport([result(WORDS)]);
+  it('refuses empty or blank words without sending a query', async () => {
+    const { transport, routed } = recordingTransport([result(WORDS)]);
+    const user = userOn(transport);
 
-    await userOn(transport).bootstrap('');
-
-    expect(routed[0]!.Query).toBe('user.bootstrap?generate=true');
-    expect(streamed).toEqual([]);
+    await expect(user.bootstrap('')).rejects.toBeInstanceOf(TypeError);
+    await expect(user.bootstrap('  \n ')).rejects.toBeInstanceOf(TypeError);
+    expect(routed).toEqual([]);
   });
 
   it('sends the passphrase as the passphrase argument, only when non-empty', async () => {

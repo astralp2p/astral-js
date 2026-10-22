@@ -1,8 +1,9 @@
 // api/user — the user protocol client (swarm membership, node contracts, expulsion).
 // Built on the apphost WebSocket client's query. Client-side ops: newNodeContract,
 // acceptMembership, acceptContract, expel; app-facing ops: info, adopt, swarmStatus;
-// setup op: bootstrap. Populated by: dev/api-user, dev/api-settings-app,
-// dev/user-accept-contract, dev/user-bootstrap.
+// setup ops: deriveIdentity, bootstrap, join. Populated by: dev/api-user,
+// dev/api-settings-app, dev/user-accept-contract, dev/user-bootstrap,
+// dev/confine-token-less-sessions.
 
 /**
  * The `user` protocol client: the app-facing slice of a node's swarm-membership
@@ -22,16 +23,19 @@
  *   - Spec: `astral-docs .../protocols/user/ops/user.{new_node_contract,
  *     accept_membership,expel}.md`.
  *
- * Eight operations live here: the four CLIENT-driven ceremony ops
+ * Ten operations live here: the four CLIENT-driven ceremony ops
  * ({@link User.newNodeContract}, {@link User.acceptMembership},
  * {@link User.acceptContract}, {@link User.expel}), the three app-facing
  * status/management ops ({@link User.info}, {@link User.adopt},
- * {@link User.swarmStatus}), and the one-call setup op {@link User.bootstrap},
+ * {@link User.swarmStatus}), and the three setup ops of an unclaimed node
+ * ({@link User.deriveIdentity}, {@link User.bootstrap}, {@link User.join}),
  * grounded in the protocol spec
- * (`astral-docs .../protocols/user/ops/user.{info,adopt,swarm_status,bootstrap}.md`,
- * `.../protocols/user/types/mod.user.bootstrap_result.md`), the astrald server
- * ops (`mod/user/src/op_{info,adopt,swarm_status,bootstrap}.go`), and the Go
- * client (`api/user/client/bootstrap.go`, `api/user/bootstrap_result.go`). The
+ * (`astral-docs .../protocols/user/ops/user.{info,adopt,swarm_status,derive_identity,bootstrap,join}.md`,
+ * `.../protocols/user/types/mod.user.{derive_identity_result,bootstrap_result}.md`),
+ * the astrald server ops
+ * (`mod/user/src/op_{info,adopt,swarm_status,derive_identity,bootstrap,join}.go`),
+ * and the Go client (`api/user/client/{derive_identity,bootstrap,join}.go`,
+ * `api/user/{derive_identity_result,bootstrap_result}.go`). The
  * remaining `user.*` op strings (`user.assets`, `user.request_membership`,
  * `user.list_siblings`, `user.list_expelled`, `user.sync_with`,
  * `user.sync_assets`, `user.add_asset`, `user.remove_asset`) are
@@ -50,14 +54,14 @@
  */
 
 import type { Host } from '../../apphost/host.js';
-import { Ops, BOOTSTRAP_RESULT_TYPE } from './consts.js';
+import { Ops, BOOTSTRAP_RESULT_TYPE, DERIVE_IDENTITY_RESULT_TYPE } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
 import { ObjectTypes, eos, isAck, isError } from '../../astral/object.js';
 import type { Identity } from '../../astral/identity.js';
 import { parseIdentity } from '../../astral/identity.js';
 import { ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
 
-export { BOOTSTRAP_RESULT_TYPE } from './consts.js';
+export { BOOTSTRAP_RESULT_TYPE, DERIVE_IDENTITY_RESULT_TYPE } from './consts.js';
 
 /**
  * An unsigned authorization contract (`mod.auth.contract`) as a pass-through
@@ -131,31 +135,137 @@ export interface BootstrapResultValue {
    * the caller sent the words.
    */
   Mnemonic: string;
+  /**
+   * An apphost access token issued for the user, valid for 365 days. A session
+   * that connects with it acts as the user. Empty when the node sent none.
+   */
+  Token: string;
 }
 
-/** Options for {@link User.bootstrap}. */
+/**
+ * The JSON `value` of a `mod.user.derive_identity_result` {@link AstralObject}:
+ * the reply of `user.derive_identity`. Field names are the Go struct's exported
+ * names (astral-docs `protocols/user/types/mod.user.derive_identity_result.md`).
+ */
+export interface DeriveIdentityResultValue {
+  /**
+   * The user the words derive along `m/1791'/0'/0'/0/0`: the user
+   * `user.bootstrap` claims the node for with the same words and passphrase.
+   */
+  Identity: Identity;
+  /**
+   * The BIP-39 words the node generated, separated by single spaces. Empty when
+   * the caller sent the words.
+   */
+  Mnemonic: string;
+}
+
+/** Options for {@link User.bootstrap} and {@link User.deriveIdentity}. */
 export interface BootstrapOptions {
   /** The BIP-39 passphrase of the seed. The seed has no passphrase when omitted or empty. */
   passphrase?: string;
 }
 
-/** Parse the `user.bootstrap` reply, rejecting any other shape with a {@link ProtocolError}. */
-function parseBootstrapResult(o: AstralObject): BootstrapResultValue {
-  if (o.type !== BOOTSTRAP_RESULT_TYPE) {
-    throw new ProtocolError(`user.bootstrap: unexpected object type ${JSON.stringify(o.type)}`);
+/** Options for {@link User.deriveIdentity}: the options of {@link User.bootstrap}. */
+export type DeriveIdentityOptions = BootstrapOptions;
+
+/** Read an optional string field of a reply value; absent or `null` reads as empty. */
+function optionalString(type: string, v: Record<string, unknown>, field: string): string {
+  const s = v[field];
+  if (s === undefined || s === null) return '';
+  if (typeof s !== 'string') throw new ProtocolError(`${type}: ${field} is not a string`);
+  return s;
+}
+
+/**
+ * Parse a reply of `op` that must be an object of `type` carrying `Identity`
+ * and `Mnemonic`, rejecting any other shape with a {@link ProtocolError}.
+ * Returns the parsed identity and words plus the raw value for further fields.
+ */
+function parseWordsResult(
+  op: string,
+  type: string,
+  o: AstralObject,
+): { Identity: Identity; Mnemonic: string; value: Record<string, unknown> } {
+  if (o.type !== type) {
+    throw new ProtocolError(`${op}: unexpected object type ${JSON.stringify(o.type)}`);
   }
   const v = o.value;
   if (typeof v !== 'object' || v === null || Array.isArray(v)) {
     throw new ProtocolError(`${o.type}: value is not an object`);
   }
-  const { Identity: id, Mnemonic: mnemonic } = v as Record<string, unknown>;
-  if (mnemonic !== undefined && mnemonic !== null && typeof mnemonic !== 'string') {
-    throw new ProtocolError(`${o.type}: Mnemonic is not a string`);
-  }
+  const value = v as Record<string, unknown>;
+  const mnemonic = optionalString(o.type, value, 'Mnemonic');
   try {
-    return { Identity: parseIdentity(id as string), Mnemonic: mnemonic ?? '' };
+    return { Identity: parseIdentity(value.Identity as string), Mnemonic: mnemonic, value };
   } catch (err) {
     throw new ProtocolError(`${o.type}: ${(err as Error).message}`);
+  }
+}
+
+/** Parse the `user.bootstrap` reply, rejecting any other shape with a {@link ProtocolError}. */
+function parseBootstrapResult(o: AstralObject): BootstrapResultValue {
+  const {
+    Identity: id,
+    Mnemonic: mnemonic,
+    value,
+  } = parseWordsResult(Ops.bootstrap, BOOTSTRAP_RESULT_TYPE, o);
+  return { Identity: id, Mnemonic: mnemonic, Token: optionalString(o.type, value, 'Token') };
+}
+
+/** Parse the `user.derive_identity` reply, rejecting any other shape with a {@link ProtocolError}. */
+function parseDeriveIdentityResult(o: AstralObject): DeriveIdentityResultValue {
+  const { Identity: id, Mnemonic: mnemonic } = parseWordsResult(
+    Ops.deriveIdentity,
+    DERIVE_IDENTITY_RESULT_TYPE,
+    o,
+  );
+  return { Identity: id, Mnemonic: mnemonic };
+}
+
+/**
+ * Run an op that takes BIP-39 words the way `user.bootstrap` and
+ * `user.derive_identity` do, and parse its single reply with `parse`.
+ *
+ * Omitted `words` sends `generate=true` and streams nothing; given `words`
+ * stream as one `string16` followed by `eos`. Empty or blank `words` throw a
+ * `TypeError` before any query is sent. `passphrase` travels as the
+ * `passphrase` query argument, omitted when empty.
+ */
+async function wordsOp<T>(
+  host: Host,
+  op: string,
+  words: string | undefined,
+  opts: BootstrapOptions,
+  parse: (o: AstralObject) => T,
+): Promise<T> {
+  // why: an empty form field must not reach the node as words the caller
+  // never sees; generating is asked for by omitting the words.
+  if (words !== undefined && words.trim() === '') {
+    throw new TypeError(`${op}: words are empty; omit them to generate new words`);
+  }
+  const generate = words === undefined;
+  const stream = await host.query(op, {
+    args: {
+      generate: generate ? true : undefined,
+      passphrase: opts.passphrase || undefined,
+    },
+  });
+  try {
+    if (!generate) {
+      // why: a query string is logged, the stream is not.
+      stream.send({ type: ObjectTypes.String16, value: words });
+      stream.send(eos());
+    }
+
+    for await (const o of stream) {
+      if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
+      return parse(o);
+    }
+    // The node closed/ended the stream without a result.
+    throw new ProtocolError(`${op} returned no result`);
+  } finally {
+    stream.close();
   }
 }
 
@@ -434,16 +544,69 @@ export class User {
   }
 
   /**
+   * Return the user that BIP-39 `words` derive, without claiming the node.
+   *
+   * The node derives the user's key from the words along `m/1791'/0'/0'/0/0`
+   * with the derivation of {@link User.bootstrap}, so the same words and
+   * passphrase give the identity `user.bootstrap` claims the node for. The node
+   * stores nothing, signs nothing and changes no state. The reply is a
+   * `mod.user.derive_identity_result`, returned as its
+   * {@link DeriveIdentityResultValue}. Omitted `words` asks the node to
+   * generate 24 words; the reply's `Mnemonic` then carries them and the node
+   * keeps no copy. With `words` given, `Mnemonic` is empty. Empty or blank
+   * `words` throw a `TypeError` before any query is sent.
+   *
+   * A client that sets up a node for a new user calls this without `words`,
+   * shows the words and the identity, and sends the same words to
+   * {@link User.bootstrap} once the user has recorded them. A client that
+   * restores a user sends the user's words and shows the identity before the
+   * claim.
+   *
+   * WIRE — as {@link User.bootstrap}: `words` travel in the stream as one
+   * `string16` followed by `eos`, never in the query string; without `words`
+   * the query carries `generate=true` and the stream carries nothing;
+   * `passphrase` travels as the `passphrase` query argument, omitted when
+   * empty. (Go `Client.DeriveIdentity`, server `OpDeriveIdentity`.)
+   *
+   * LIVE-NODE CAVEAT. The node rejects the query (a {@link QueryRejected} from
+   * {@link Host.query}) without a code when its origin is not local. The
+   * node's apphost admits `user.derive_identity` from a session without a
+   * token only while the node is unclaimed, and from a web session without a
+   * token only when its origin is a trusted web source; otherwise the session
+   * gets a wire `denied` (a {@link Denied} from {@link Host.query}). Past the
+   * accept gate the node streams an `error_message`, surfaced as a
+   * {@link RemoteError}, when the words are not valid BIP-39 words, when the
+   * node runs without the `bip137sig` module, or when word generation fails.
+   * A reply other than a `mod.user.derive_identity_result`, or none, rejects
+   * with a {@link ProtocolError}.
+   *
+   * @param words The BIP-39 words, separated by whitespace; the node generates
+   *   24 words when omitted.
+   * @param opts.passphrase The BIP-39 passphrase of the seed.
+   * @returns The {@link DeriveIdentityResultValue}: the user's identity and,
+   *   when the node generated them, the words.
+   */
+  async deriveIdentity(
+    words?: string,
+    opts: DeriveIdentityOptions = {},
+  ): Promise<DeriveIdentityResultValue> {
+    return wordsOp(this.host, Ops.deriveIdentity, words, opts, parseDeriveIdentityResult);
+  }
+
+  /**
    * Claim this unclaimed node for the user that BIP-39 `words` derive, in one
-   * call, and return that user.
+   * call, and return that user with an access token for it.
    *
    * The node derives the user's key from the words along `m/1791'/0'/0'/0/0`,
    * signs the claim contract as the user and as itself, stores the user's key,
-   * and activates the contract. The reply is a `mod.user.bootstrap_result`,
-   * returned as its {@link BootstrapResultValue}. Omitted `words` asks the node
-   * to generate 24 words; the reply's `Mnemonic` then carries them and is the
-   * only copy anywhere. With `words` given, `Mnemonic` is empty. Empty or blank
-   * `words` throw a `TypeError` before any query is sent.
+   * activates the contract, and issues an apphost access token for the user.
+   * The reply is a `mod.user.bootstrap_result`, returned as its
+   * {@link BootstrapResultValue}. Omitted `words` asks the node to generate 24
+   * words; the reply's `Mnemonic` then carries them and is the only copy
+   * anywhere. With `words` given, `Mnemonic` is empty. Empty or blank `words`
+   * throw a `TypeError` before any query is sent. A client that confirms the
+   * user's backup before the claim draws the words with
+   * {@link User.deriveIdentity} and sends them here.
    *
    * WIRE — `words` travel in the stream as one `string16` followed by `eos`,
    * never in the query string: a query string is logged, the stream is not.
@@ -456,51 +619,66 @@ export class User {
    * {@link Host.query}) without a code when its origin is not local, with code
    * `2` when the node already has an active contract, and with code `4` when
    * the caller is not the node itself. A caller with no identity counts as the
-   * node: an anonymous web guest has none, and the node's apphost admits
-   * `user.bootstrap` for such guests only while the node is unclaimed. On a
-   * claimed node an anonymous web guest gets a wire `denied` (a {@link Denied}
-   * from {@link Host.query}) instead of code `2`. Past the accept gate the
-   * node streams an `error_message`, surfaced as a {@link RemoteError}, when
-   * the words are not valid BIP-39 words, when the claim rule of
-   * `auth.sign_contract` refuses the user, when the node runs without the
-   * `bip137sig` module, or when signing or storage fails. A reply other than
-   * a `mod.user.bootstrap_result`, or none, rejects with a
+   * node: a session without a token has none, and the node's apphost admits
+   * `user.bootstrap` for such sessions only while the node is unclaimed, and
+   * from a web session only when its origin is a trusted web source. On a
+   * claimed node a session without a token gets a wire `denied` (a
+   * {@link Denied} from {@link Host.query}) instead of code `2`. Past the
+   * accept gate the node streams an `error_message`, surfaced as a
+   * {@link RemoteError}, when the words are not valid BIP-39 words, when the
+   * claim rule of `auth.sign_contract` refuses the user, when the node runs
+   * without the `bip137sig` module, when signing or storage fails, or when the
+   * access token cannot be issued (the node is then claimed). A reply other
+   * than a `mod.user.bootstrap_result`, or none, rejects with a
    * {@link ProtocolError}.
    *
    * @param words The BIP-39 words, separated by whitespace; the node generates
    *   24 words when omitted.
    * @param opts.passphrase The BIP-39 passphrase of the seed.
-   * @returns The {@link BootstrapResultValue}: the user's identity and, when
-   *   the node generated them, the words.
+   * @returns The {@link BootstrapResultValue}: the user's identity, the user's
+   *   access token and, when the node generated them, the words.
    */
   async bootstrap(words?: string, opts: BootstrapOptions = {}): Promise<BootstrapResultValue> {
-    // why: an empty form field must not claim the node with words the caller
-    // never sees; generating is asked for by omitting the words.
-    if (words !== undefined && words.trim() === '') {
-      throw new TypeError('user.bootstrap: words are empty; omit them to generate new words');
-    }
-    const generate = words === undefined;
-    const stream = await this.host.query(Ops.bootstrap, {
-      args: {
-        generate: generate ? true : undefined,
-        passphrase: opts.passphrase || undefined,
-      },
-    });
-    try {
-      if (!generate) {
-        // why: a query string is logged, the stream is not.
-        stream.send({ type: ObjectTypes.String16, value: words });
-        stream.send(eos());
-      }
+    return wordsOp(this.host, Ops.bootstrap, words, opts, parseBootstrapResult);
+  }
 
-      for await (const o of stream) {
-        if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
-        return parseBootstrapResult(o);
-      }
-      // The node closed/ended the stream without a result.
-      throw new ProtocolError('user.bootstrap returned no result');
-    } finally {
-      stream.close();
+  /**
+   * Make this unclaimed node request membership from `node`, a node of a
+   * swarm, and return the membership contract this node now holds as its
+   * active contract.
+   *
+   * Sends `user.join?node=<node>`. The node sends `user.request_membership` to
+   * `node` as itself; the swarm node's join policy decides the request and, on
+   * admission, sends a contract signed by its user to this node's
+   * `user.accept_membership`, which this node's invite policy decides. The
+   * reply is the signed contract — a `mod.auth.signed_contract` object —
+   * returned verbatim as an {@link AstralObject}. (Go `Client.Join`, server
+   * `OpJoin`.)
+   *
+   * REJECT CODES (each a {@link QueryRejected} from {@link Host.query}): none
+   * when the origin is not local; `2` — the node already has an active
+   * contract; `4` — the caller is not the node itself (a caller with no
+   * identity counts as the node); `3` — `node` does not resolve, resolves to
+   * the anonymous identity, or names this node. The node's apphost admits
+   * `user.join` from a session without a token only while the node is
+   * unclaimed, and from a web session only when its origin is a trusted web
+   * source; otherwise the session gets a wire `denied` (a {@link Denied}).
+   * Past the accept gate the node streams an `error_message`, surfaced as a
+   * {@link RemoteError}: `request declined` (the swarm node's join policy),
+   * `invitation declined` (this node's invite policy), `query rejected (2)`
+   * (the swarm node has no active contract), or another message when the swarm
+   * node cannot be reached or issuing, signing or storing fails. An accepted
+   * query that yields no object rejects with a {@link ProtocolError}.
+   *
+   * @param node The swarm node to join: an alias, an {@link Identity}, or its
+   *   string form.
+   * @returns The `mod.auth.signed_contract` {@link AstralObject}.
+   */
+  async join(node: Identity | string): Promise<SignedContract> {
+    const objs = await this.host.call(Ops.join, { args: { node } });
+    if (objs.length === 0) {
+      throw new ProtocolError('user.join returned no signed contract');
     }
+    return objs[0]!;
   }
 }

@@ -10,7 +10,12 @@ export const Ops = {
   adopt: 'user.adopt',
   swarmStatus: 'user.swarm_status',
   bootstrap: 'user.bootstrap',
+  deriveIdentity: 'user.derive_identity',
+  join: 'user.join',
 } as const;
 
 /** Wire type tag of the `user.bootstrap` reply. */
 export const BOOTSTRAP_RESULT_TYPE = 'mod.user.bootstrap_result';
+
+/** Wire type tag of the `user.derive_identity` reply. */
+export const DERIVE_IDENTITY_RESULT_TYPE = 'mod.user.derive_identity_result';

@@ -72,7 +72,10 @@ same `Session` / `Transport` seam.
 - **user** — swarm membership: `newNodeContract(alias)`, `acceptMembership(contract, issuerSig)`, `expel(nodeID)`;
   status/management: `info()→UserInfoValue`, `adopt(target)`,
   `swarmStatus()→SwarmMemberValue[]` (member tag is the plural
-  `mod.users.swarm_member`).
+  `mod.users.swarm_member`); setup: `bootstrap(words?, {passphrase?})→BootstrapResultValue`
+  (claims an unclaimed node in one call; the words travel in the stream, never
+  in the query; no words sends `generate=true` and the reply's `Mnemonic`
+  carries the generated words).
 - **auth** — permission contracts: `signContract(contract)`, `index(objectID)`.
 - **services** — provider: `advertise(handlers)→Binding` (`{ [service]: (caller) => Offering | null }`;
   `change(...callers)`, `changeAll()`, `close()`, `done`); consumer: `discover(names, follow?)→DiscoveryStream`

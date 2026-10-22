@@ -9,4 +9,8 @@ export const Ops = {
   info: 'user.info',
   adopt: 'user.adopt',
   swarmStatus: 'user.swarm_status',
+  bootstrap: 'user.bootstrap',
 } as const;
+
+/** Wire type tag of the `user.bootstrap` reply. */
+export const BOOTSTRAP_RESULT_TYPE = 'mod.user.bootstrap_result';

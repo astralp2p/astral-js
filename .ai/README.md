@@ -81,7 +81,7 @@ same `Session` / `Transport` seam.
   For `deriveIdentity` and `bootstrap` the words travel in the stream, never in
   the query; no words sends `generate=true` and the reply's `Mnemonic` carries
   the generated words.
-- **auth** — permission contracts: `signContract(contract)`, `index(objectID)`.
+- **auth** — permission contracts: `signContract(contract)`.
 - **services** — provider: `advertise(handlers)→Binding` (`{ [service]: (caller) => Offering | null }`;
   `change(...callers)`, `changeAll()`, `close()`, `done`); consumer: `discover(names, follow?)→DiscoveryStream`
   of `update` / `removed` / `initial` events, and `watch(names)→Watcher` (`offerings()`, `initial`,
@@ -105,7 +105,7 @@ same `Session` / `Transport` seam.
   origin policy refusal).
 
 Method names mirror the op strings (camelCase of the op's operation segment):
-`user.new_node_contract`→`newNodeContract`, `auth.index`→`index`, etc. The three
+`user.new_node_contract`→`newNodeContract`, `dir.resolve`→`resolve`, etc. The three
 above (user/auth/services) pass complex signed objects — `Contract`,
 `Signature`, `SignedExpulsion`, `services.update` — through as `AstralObject`
 (no `Permit`/`Bundle` schema). They need **live-node confirmation** of the

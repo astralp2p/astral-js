@@ -3,5 +3,4 @@
 /** The `auth.*` operation names, sent as the op of an apphost query. */
 export const Ops = {
   signContract: 'auth.sign_contract',
-  index: 'auth.index',
 } as const;

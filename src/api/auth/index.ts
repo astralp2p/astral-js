@@ -1,33 +1,23 @@
-// api/auth — the auth protocol client (permission contracts: sign, index).
-// Built on the apphost WebSocket client's query. Basic ops: signContract,
-// index. Populated by: dev/api-auth.
+// api/auth — the auth protocol client (permission contracts: sign).
+// Built on the apphost WebSocket client's query. Basic op: signContract.
+// Populated by: dev/api-auth.
 
 /**
- * The `auth` protocol client: sign authorization contracts and index a signed
- * contract into the node's auth store.
+ * The `auth` protocol client: sign authorization contracts.
  *
  * A thin, typed wrapper over a {@link Host} that speaks the `auth.*` operations
  * exactly as the reference node serves them. Grounded in both implementations:
- *   - Go client: `api/auth/client/{sign_contract,index_contract}.go`, method
- *     name constants from `api/auth/module.go` (`MethodSignContract` =
- *     `auth.sign_contract`, `MethodIndex` = `auth.index`).
- *   - Go node ops: `mod/auth/src/op_{sign_contract,index}.go` (the wire flow).
+ *   - Go client: `api/auth/client/sign_contract.go`, method name constant from
+ *     `api/auth/module.go` (`MethodSignContract` = `auth.sign_contract`).
+ *   - Go node op: `mod/auth/src/op_sign_contract.go` (the wire flow).
  *
- * The two ops differ in how their arguments reach the node, so they use
- * different transport shapes:
- *
- *   - {@link Auth.signContract} — query `auth.sign_contract` with NO args, then
- *     *stream* the {@link Contract} object followed by `eos`, and read back the
- *     single `mod.auth.signed_contract` reply. This is a bidirectional op like
- *     `tree.set`: the contract travels as a streamed object (not a query arg) so
- *     its full nested shape round-trips intact (Go `Client.SignContract` sends
- *     the contract after the channel is established; node `OpSignContract` reads
- *     a `Contract`, signs it, and sends the `SignedContract` back).
- *   - {@link Auth.index} — query `auth.index` with `{ id }` folded into
- *     the query string, and await the node's single `ack` (resolving `void`).
- *     The object id is a query argument, not a streamed object (Go
- *     `Client.IndexContract` passes `query.Args{"id": objectID}`; node `OpIndex`
- *     reads the arg, loads the signed contract by id, indexes it, and acks).
+ * {@link Auth.signContract} queries `auth.sign_contract` with NO args, then
+ * *streams* the {@link Contract} object followed by `eos`, and reads back the
+ * single `mod.auth.signed_contract` reply. This is a bidirectional op like
+ * `tree.set`: the contract travels as a streamed object (not a query arg) so
+ * its full nested shape round-trips intact (Go `Client.SignContract` sends the
+ * contract after the channel is established; node `OpSignContract` reads a
+ * `Contract`, signs it, and sends the `SignedContract` back).
  *
  * Complex signed objects (the {@link Contract} and {@link SignedContract}) are
  * passed through as friendly {@link AstralObject}s: the SDK does not impose a
@@ -36,7 +26,7 @@
  * object `value` directly. The type aliases below document the JSON shape that
  * is obvious from the Go types, but they remain structurally `AstralObject`.
  *
- * Only these BASIC ops live here. The node's contract-query / verify /
+ * Only this BASIC op lives here. The node's contract-query / verify /
  * authorize surface is not exposed through this client.
  *
  * @module api/auth
@@ -45,9 +35,7 @@
 import type { Host } from '../../apphost/host.js';
 import { Ops } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
-import { eos, isError, isAck } from '../../astral/object.js';
-import type { ObjectID } from '../../astral/objectid.js';
-import { parseObjectID } from '../../astral/objectid.js';
+import { eos, isError } from '../../astral/object.js';
 import { RemoteError, ProtocolError, readErrorMessage } from '../../astral/errors.js';
 
 /**
@@ -86,9 +74,6 @@ export type SignedContract = AstralObject;
  *   type: 'mod.auth.contract',
  *   value: { Issuer, Subject, Permits, ExpiresAt },
  * });
- *
- * // Index a signed contract the node already holds, by its object id.
- * await auth.index('data1...');   // resolves void
  * ```
  */
 export class Auth {
@@ -135,41 +120,6 @@ export class Auth {
       }
       // The node closed/ended the stream without sending the signed contract.
       throw new ProtocolError('auth.sign_contract returned no signed contract');
-    } finally {
-      stream.close();
-    }
-  }
-
-  /**
-   * Index the signed contract identified by `objectID` into the node's auth
-   * store.
-   *
-   * Sends query `auth.index?id=<id>` and awaits the node's single `ack`,
-   * resolving `void`. The object id travels as a query argument (not a streamed
-   * object); the node loads the `mod.auth.signed_contract` at that id, verifies
-   * and indexes it, then acks (Go `Client.IndexContract` + node `OpIndex`).
-   * Rejects with a {@link RemoteError} if the node reports a failure — the id is
-   * unknown, the stored object is not a signed contract, or a signature does not
-   * verify — and with a {@link ProtocolError} if the node ends the stream
-   * without acking.
-   *
-   * The id is validated through {@link parseObjectID} before the call, so a
-   * malformed id rejects with a `TypeError` without touching the network.
-   *
-   * @param objectID The object id of the signed contract to index (an
-   *   {@link ObjectID} or its `data1…` string).
-   */
-  async index(objectID: ObjectID | string): Promise<void> {
-    const id = parseObjectID(objectID);
-    const stream = await this.host.query(Ops.index, { args: { id } });
-    try {
-      for await (const o of stream) {
-        if (isError(o)) throw new RemoteError(readErrorMessage(o) ?? 'remote error');
-        if (isAck(o)) return;
-        throw new ProtocolError(`auth.index expected an ack, got ${o.type}`);
-      }
-      // The node ended the stream without acking.
-      throw new ProtocolError(`auth.index for ${JSON.stringify(id)} was not acknowledged`);
     } finally {
       stream.close();
     }

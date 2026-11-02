@@ -209,10 +209,11 @@ export class Apphost {
    * `mod.apphost.request_grant_request` and resolves on the node's `ack`. The
    * host must be connected with the requester's access token: the grantee is
    * the session's identity. Any requester may ask. The node always asks its
-   * grant-request policy (`accept_all`, `reject_all`, or a delegate; unset is
-   * `reject_all`), even for permits already held. The call waits while a
-   * delegate decides, so the stream stays open until the answer. An approval
-   * writes each permit with its constraints and the requested expiry.
+   * grant-request policy, even for permits already held: a stored delegate
+   * decides; otherwise an unset mode or `accept_all` approves, and `reject_all`
+   * or any other stored mode refuses. The call waits while a delegate decides,
+   * so the stream stays open until the answer. An approval writes each permit
+   * with its constraints and the requested expiry.
    *
    * Refusals arrive as a {@link RemoteError}: "grant declined" from the policy,
    * or "invalid permit: <action>: <reason>", which the node answers before it

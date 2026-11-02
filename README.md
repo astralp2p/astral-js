@@ -133,9 +133,10 @@ const app = new Apphost(await connect(url, { token: Token }));
 await app.requestGrant([discoveryPermit(['inference'])], { durationMs: 3600000 });
 
 // Admin (a host connected with an admin token): list, add and revoke grants.
-const grants = await apphost.listGrants(Identity); // [{ ID, Permit, ExpiresAt }]
-await apphost.grant(Identity, ['mod.auth.see_objects_action'], { durationMs: 60000 });
-await apphost.revoke(Identity, { id: grants[0].ID }); // or { action }
+const admin = new Apphost(await connect(url, { token: adminToken }));
+const grants = await admin.listGrants(Identity); // [{ ID, Permit, ExpiresAt }]
+await admin.grant(Identity, ['mod.auth.see_objects_action'], { durationMs: 60000 });
+await admin.revoke(Identity, { id: grants[0].ID }); // or { action }
 ```
 
 Grants accumulate: a new grant never replaces an earlier one. Constraints on an

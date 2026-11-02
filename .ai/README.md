@@ -134,9 +134,9 @@ signing/exchange choreography before being treated as frozen.
   object, not the query arg — the astral-py query form is used here), and
   `objects.contains` (default-repository dependency), and the settings-app
   batch (`nearby`, `bip137sig`, `user.{info,adopt,swarm_status}`,
-  `objects.store`, `apphost.register` — grounded in the spec + the astrald
-  server ops, exercised only by the settings app's earlier hand-rolled
-  client). Confirm against a running node before treating these as frozen.
+  `objects.store` — grounded in the spec + the astrald server ops, exercised
+  only by the settings app's earlier hand-rolled client). Confirm against a
+  running node before treating these as frozen.
 
 ## Spec (the `system` submodule = astral-docs)
 

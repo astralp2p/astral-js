@@ -108,6 +108,15 @@ describe('Apphost.requestGrant', () => {
     expect(closes()).toBe(1);
   });
 
+  it('sends durationMs as Duration in nanoseconds', async () => {
+    const { transport, streamed, closes } = recordingTransport([ACK]);
+
+    await apphostOn(transport).requestGrant([SEE], { durationMs: 60000 });
+
+    expect((streamed[0]!.value as Record<string, unknown>).Duration).toBe(60000000000);
+    expect(closes()).toBe(1);
+  });
+
   it('surfaces a declined request as a RemoteError', async () => {
     const { transport, closes } = recordingTransport([
       { type: 'error_message', value: 'grant declined' },
@@ -186,6 +195,7 @@ describe('Apphost.revoke', () => {
     ['both id and action', { id: 7, action: SEE }],
     ['neither id nor action', {}],
     ['a negative id', { id: -1 }],
+    ['a fractional id', { id: 1.5 }],
     ['an empty action', { action: '' }],
   ])('refuses %s before routing', async (_, target) => {
     const { transport, routed } = recordingTransport([ACK]);

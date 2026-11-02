@@ -9,8 +9,9 @@
  *
  * Signatures and public keys travel in the compact text form
  * `<scheme>:<base64-or-hex>` (e.g. `bip137:…`), so the ops return and
- * accept plain strings — there is no per-scheme decoding here. The node holds
- * the private key material; this client only names the key/scheme.
+ * accept plain strings — there is no per-scheme decoding here. The node, or the
+ * app that holds a `crypto.register_signer` binding for the key, holds the
+ * private key material; this client only names the key/scheme.
  *
  * Grounded in the reference implementations:
  *   - Go: `mod/crypto/src/op_{public_key,sign_text,verify_text_signature,sign_hash,verify_hash_signature}.go`
@@ -120,8 +121,11 @@ export class Crypto {
   }
 
   /**
-   * Sign `text` with a node-held key and return the compact signature
-   * `<scheme>:<base64>`.
+   * Sign `text` and return the compact signature `<scheme>:<base64>`.
+   * The node signs with its own private key for the key when it holds one,
+   * and otherwise through the app that holds a `crypto.register_signer` binding
+   * for the key. A signature through a binding can wait for a person to approve
+   * it, for up to the node's `signer_timeout` (default 5 minutes).
    *
    * Sends `crypto.sign_text` with `text` and, when given, `key` / `scheme`
    * folded into the query string. Signs under the caller's identity unless
@@ -175,14 +179,18 @@ export class Crypto {
   }
 
   /**
-   * Sign a hex-encoded `hash` with a node-held key and return the compact
-   * signature `<scheme>:<base64>`.
+   * Sign a hex-encoded `hash` and return the compact signature
+   * `<scheme>:<base64>`. The node signs with its own private key for the key
+   * when it holds one, and otherwise through the app that holds a
+   * `crypto.register_signer` binding for the key. A signature through a binding
+   * can wait for a person to approve it, for up to the node's `signer_timeout`
+   * (default 5 minutes).
    *
    * Sends `crypto.sign_hash` with `hash` and, when given, `key` folded into
-   * the query string; with a `hash` argument the node signs immediately and
-   * replies with one `mod.crypto.signature` object (`op_sign_hash.go`). The
-   * streamed `mod.crypto.hash` form is not needed here: a digest is
-   * fixed-size, so it always fits the query string. Signs under the caller's
+   * the query string; with a `hash` argument the node reads no hash from the
+   * stream and replies with one `mod.crypto.signature` object
+   * (`op_sign_hash.go`). The streamed `mod.crypto.hash` form is not needed
+   * here: a digest is fixed-size, so it always fits the query string. Signs under the caller's
    * identity unless `opts.key` names a specific public key.
    *
    * The scheme is always sent explicitly. Hash signing defaults to `asn1` on

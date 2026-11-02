@@ -9,6 +9,7 @@ import { watch, type Watcher } from './watch.js';
 
 export { Ops, Types, UPDATE_TYPE, MAX_NAMES } from './consts.js';
 export { joinNames, validateName } from './names.js';
+export { DISCOVERY_ACTION, DISCOVERY_SCOPE_TYPE, discoveryPermit } from './scope.js';
 export { offeringKey } from './types.js';
 export type {
   AskValue,

@@ -86,6 +86,8 @@ import { Dir } from 'astral-js/api/dir';
 import { Crypto } from 'astral-js/api/crypto';
 import { Tree } from 'astral-js/api/tree';
 import { Objects } from 'astral-js/api/objects';
+import { Apphost } from 'astral-js/api/apphost';
+import { discoveryPermit } from 'astral-js/api/services';
 
 const dir = new Dir(host);
 const id = await dir.resolve('alice'); // Identity
@@ -120,7 +122,24 @@ await objects.registerBlueprint({
   ],
 });
 const bp = await objects.getBlueprint('app.message'); // Blueprint
+
+// Register as an app (anonymous host), then ask for a scoped grant with the token.
+const apphost = new Apphost(host);
+const { Token, Identity } = await apphost.register({
+  name: 'My App',
+  permits: ['mod.auth.see_objects_action'],
+});
+const app = new Apphost(await connect(url, { token: Token }));
+await app.requestGrant([discoveryPermit(['inference'])], { durationMs: 3600000 });
+
+// Admin (a host connected with an admin token): list, add and revoke grants.
+const grants = await apphost.listGrants(Identity); // [{ ID, Permit, ExpiresAt }]
+await apphost.grant(Identity, ['mod.auth.see_objects_action'], { durationMs: 60000 });
+await apphost.revoke(Identity, { id: grants[0].ID }); // or { action }
 ```
+
+Grants accumulate: a new grant never replaces an earlier one. Constraints on an
+action that ignores them are stored as sent and have no effect.
 
 ## Primitives
 

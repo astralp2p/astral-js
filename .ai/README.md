@@ -101,14 +101,25 @@ same `Session` / `Transport` seam.
   `seed(phrase,{passphrase?})`, `deriveKey(seed,{path?})` (the three input ops
   stream one object + eos, read one reply).
 - **apphost** (ops, `astral-js/api/apphost` — distinct from the client lib) —
-  `register()→AccessTokenValue` (mint a guest identity + token; reject code 1 =
-  origin policy refusal).
+  `register({name?, permits?, contractPermits?})→AccessTokenValue` (mint a
+  guest identity + token; streams one `mod.apphost.register_request`),
+  `grant(identity, permits, {durationMs?})` (streams one
+  `mod.apphost.grant_request`, reads `ack`),
+  `requestGrant(permits, {durationMs?})` (streams one
+  `mod.apphost.request_grant_request`, reads `ack`; waits while a delegate
+  decides), `listGrants(identity)→GrantValue[]` (`mod.apphost.grant`:
+  `{ID, Permit, ExpiresAt}`, `ExpiresAt` `null` until revoked),
+  `revoke(identity, {id} | {action})`. Refusals are `RemoteError`s whose
+  messages are listed in `Refusals`. `discoveryPermit(services)` (at
+  `api/services`) builds a scoped discovery permit.
 
 Method names mirror the op strings (camelCase of the op's operation segment):
 `user.new_node_contract`→`newNodeContract`, `dir.resolve`→`resolve`, etc. The three
 above (user/auth/services) pass complex signed objects — `Contract`,
 `Signature`, `SignedExpulsion`, `services.update` — through as `AstralObject`
-(no `Permit`/`Bundle` schema). They need **live-node confirmation** of the
+(a `Permit` is typed as `PermitValue`, `{Action, Constraints, Delegation}`,
+at `api/auth`; `Contract` and `Bundle` contents stay pass-through). They need
+**live-node confirmation** of the
 signing/exchange choreography before being treated as frozen.
 
 ## Deferred / caveats
@@ -139,8 +150,9 @@ signing/exchange choreography before being treated as frozen.
 - `npm run check` = typecheck + lint + test + build; every change must keep it green.
 - Tests are deliberately basic: dependency-free unit tests for the astral-core
   primitives (`test/astral.test.ts` — envelope, identity, nonce, zone,
-  query-string encoding, errors). The apphost client and protocol clients are
-  covered by typecheck + build (and by exercising them against a live node), not
-  by an in-process mock server — kept simple on purpose.
+  query-string encoding, errors), and protocol client tests on a scripted
+  transport (`test/helpers/recording-transport.ts`) that records the routed
+  query and every streamed object and replays canned replies. Live-node
+  behaviour is confirmed by exercising the clients against a running node.
 - The published surface is validated by `npm run verify:pkg` (publint) plus a
   packed-tarball ESM/CJS/`.d.ts` consumer smoke.

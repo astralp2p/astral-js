@@ -20,11 +20,12 @@
  * `Contract`, signs it, and sends the `SignedContract` back).
  *
  * Complex signed objects (the {@link Contract} and {@link SignedContract}) are
- * passed through as friendly {@link AstralObject}s: the SDK does not impose a
- * schema on `Permit` / `Bundle` (those serialize as nested `{ Type, Object }`
- * envelopes per the Go `MarshalJSON`), so the caller supplies and reads the
- * object `value` directly. The type aliases below document the JSON shape that
- * is obvious from the Go types, but they remain structurally `AstralObject`.
+ * passed through as friendly {@link AstralObject}s: the caller supplies and
+ * reads the object `value` directly. The type aliases below document the JSON
+ * shape that is obvious from the Go types, but they remain structurally
+ * `AstralObject`. A permit is typed as {@link PermitValue}: a flat
+ * `{ Action, Constraints, Delegation }` object whose `Constraints` is a bundle,
+ * a JSON array of `{ Type, Object }` envelopes ({@link BundleValue}).
  *
  * Only this BASIC op lives here. The node's contract-query / verify /
  * authorize surface is not exposed through this client.
@@ -38,15 +39,17 @@ import type { AstralObject } from '../../astral/object.js';
 import { eos, isError } from '../../astral/object.js';
 import { RemoteError, ProtocolError, readErrorMessage } from '../../astral/errors.js';
 
+export { PERMIT_TYPE, permit, toPermit } from './types.js';
+export type { BundleValue, PermitInput, PermitValue } from './types.js';
+
 /**
  * The unsigned body of an authorization grant, sent to {@link Auth.signContract}.
  *
  * Structurally an {@link AstralObject}: `type` is `'mod.auth.contract'` and
  * `value` is the JSON object the Go `auth.Contract` marshals to — `Issuer` /
- * `Subject` (identity envelopes), `Permits` (a list of `mod.auth.permit`
- * envelopes), and `ExpiresAt` (a time envelope). The SDK does NOT type the
- * nested `Permit` / `Bundle` shapes; the caller builds and reads `value`
- * directly (Go `api/auth/contract.go`).
+ * `Subject` (identity envelopes), `Permits` (a list of flat
+ * {@link PermitValue} objects), and `ExpiresAt` (a time envelope). The caller
+ * builds and reads `value` directly (Go `api/auth/contract.go`).
  */
 export type Contract = AstralObject;
 

@@ -1,56 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { Host, MessageTypes } from '../src/apphost/index.js';
-import type { Session, Transport } from '../src/apphost/session.js';
+import { Host } from '../src/apphost/index.js';
+import type { Transport } from '../src/apphost/session.js';
 import { parseIdentity, unwrap, type AstralObject } from '../src/astral/index.js';
 import { ProtocolError, QueryRejected, RemoteError } from '../src/astral/errors.js';
 import { BOOTSTRAP_RESULT_TYPE, DERIVE_IDENTITY_RESULT_TYPE, User } from '../src/api/user/index.js';
+import { GUEST, NODE, recordingTransport } from './helpers/recording-transport.js';
 
-const NODE = parseIdentity('02' + 'a'.repeat(64));
-const GUEST = parseIdentity('02' + 'c'.repeat(64));
 const PEER = parseIdentity('03' + 'b'.repeat(64));
-
-/**
- * Records the route_query it is sent and every object streamed after it, then
- * replays `replies` as the response. `rejectCode` answers the route_query with
- * a query_rejected_msg instead.
- */
-function recordingTransport(replies: AstralObject[], rejectCode?: number) {
-  const routed: Array<Record<string, unknown>> = [];
-  const streamed: AstralObject[] = [];
-  let closed = 0;
-
-  const transport: Transport = {
-    async open(): Promise<Session> {
-      const queue: AstralObject[] =
-        rejectCode !== undefined
-          ? [{ type: MessageTypes.QueryRejected, value: { Code: rejectCode } }]
-          : [
-              { type: MessageTypes.QueryAccepted, value: {} },
-              ...replies,
-              { type: 'eos', value: null },
-            ];
-      return {
-        hostInfo: { identity: NODE, alias: 'node' },
-        guestID: GUEST,
-        send(o: AstralObject) {
-          if (o.type === MessageTypes.RouteQuery) {
-            routed.push(o.value as Record<string, unknown>);
-          } else {
-            streamed.push(o);
-          }
-        },
-        async recv(): Promise<AstralObject | null> {
-          return queue.shift() ?? null;
-        },
-        close() {
-          closed++;
-        },
-      } as unknown as Session;
-    },
-  };
-
-  return { transport, routed, streamed, closes: () => closed };
-}
 
 function userOn(transport: Transport): User {
   return new User(new Host(transport, NODE, 'node', GUEST));

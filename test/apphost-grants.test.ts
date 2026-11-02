@@ -194,6 +194,7 @@ describe('Apphost.revoke', () => {
   it.each([
     ['both id and action', { id: 7, action: SEE }],
     ['neither id nor action', {}],
+    ['a zero id', { id: 0 }],
     ['a negative id', { id: -1 }],
     ['a fractional id', { id: 1.5 }],
     ['an empty action', { action: '' }],

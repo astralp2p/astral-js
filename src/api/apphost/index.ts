@@ -260,14 +260,14 @@ export class Apphost {
    *
    * Sends `apphost.revoke?identity=<identity>&id=<id>` or
    * `…&action=<action>` and resolves on the node's `ack`. A grant named by
-   * `id` must belong to `identity`. The caller needs
-   * `mod.auth.admin_manage_apps_action`.
+   * `id` must belong to `identity`. Grant IDs start at 1; the node reads an
+   * `id` of 0 as absent. The caller needs `mod.auth.admin_manage_apps_action`.
    *
    * @param identity The identity whose grants to remove.
    * @param target Exactly one of `id` (from {@link Apphost.listGrants}) or
    *   `action`.
    * @throws {TypeError} On an empty identity, or unless exactly one of a
-   *   non-negative safe-integer `id` or a non-empty `action` is given; nothing
+   *   safe-integer `id` of at least 1 or a non-empty `action` is given; nothing
    *   is routed then.
    */
   async revoke(identity: Identity | string, target: RevokeTarget): Promise<void> {
@@ -275,8 +275,8 @@ export class Apphost {
     const { id, action } = target as { id?: number; action?: string };
     let args: QueryArgs;
     if (id !== undefined && action === undefined) {
-      if (!Number.isSafeInteger(id) || id < 0) {
-        throw new TypeError(`grant id is not a non-negative safe integer: ${id}`);
+      if (!Number.isSafeInteger(id) || id < 1) {
+        throw new TypeError(`grant id is not a safe integer of at least 1: ${id}`);
       }
       args = { identity, id };
     } else if (action !== undefined && id === undefined) {

@@ -14,6 +14,24 @@ export const Ops = {
   join: 'user.join',
 } as const;
 
+/** Wire type tag of the `user.info` reply. */
+export const INFO_TYPE = 'mod.user.info';
+
+/**
+ * The node states `user.info` reports in `State`. `fresh`: no manager and no
+ * active contract ever held; the node admits the appointment of a manager.
+ * `unclaimed`: no active contract, and a manager is appointed or a contract was
+ * held before. `claimed`: the node has an active contract.
+ */
+export const NodeStates = {
+  fresh: 'fresh',
+  unclaimed: 'unclaimed',
+  claimed: 'claimed',
+} as const;
+
+/** One of the {@link NodeStates}. */
+export type NodeState = (typeof NodeStates)[keyof typeof NodeStates];
+
 /** Wire type tag of the `user.bootstrap` reply. */
 export const BOOTSTRAP_RESULT_TYPE = 'mod.user.bootstrap_result';
 

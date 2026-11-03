@@ -3,7 +3,7 @@
 // acceptMembership, acceptContract, expel; app-facing ops: info, adopt, swarmStatus;
 // setup ops: deriveIdentity, bootstrap, join. Populated by: dev/api-user,
 // dev/api-settings-app, dev/user-accept-contract, dev/user-bootstrap,
-// dev/confine-token-less-sessions.
+// dev/confine-token-less-sessions, dev/node-manager-bootstrap.
 
 /**
  * The `user` protocol client: the app-facing slice of a node's swarm-membership
@@ -54,14 +54,20 @@
  */
 
 import type { Host } from '../../apphost/host.js';
-import { Ops, BOOTSTRAP_RESULT_TYPE, DERIVE_IDENTITY_RESULT_TYPE } from './consts.js';
+import { Ops, BOOTSTRAP_RESULT_TYPE, DERIVE_IDENTITY_RESULT_TYPE, INFO_TYPE } from './consts.js';
 import type { AstralObject } from '../../astral/object.js';
 import { ObjectTypes, eos, isAck, isError } from '../../astral/object.js';
 import type { Identity } from '../../astral/identity.js';
 import { parseIdentity } from '../../astral/identity.js';
 import { ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
 
-export { BOOTSTRAP_RESULT_TYPE, DERIVE_IDENTITY_RESULT_TYPE } from './consts.js';
+export {
+  BOOTSTRAP_RESULT_TYPE,
+  DERIVE_IDENTITY_RESULT_TYPE,
+  INFO_TYPE,
+  NodeStates,
+} from './consts.js';
+export type { NodeState } from './consts.js';
 
 /**
  * An unsigned authorization contract (`mod.auth.contract`) as a pass-through
@@ -94,19 +100,28 @@ export type SignedExpulsion = AstralObject;
 export type SignedContract = AstralObject;
 
 /**
- * The JSON `value` of a `mod.user.info` {@link AstralObject}: the user this
- * node belongs to, as reported by `user.info`. `Contract` is the active
- * signed contract and passes through untyped.
+ * The JSON `value` of a `mod.user.info` {@link AstralObject}, as reported by
+ * `user.info`: the node's state and manager, and on a `claimed` node the user
+ * this node belongs to. `NodeAlias`, `UserAlias`, `ContractID` and `Contract`
+ * are empty unless `State` is `claimed`. `Contract` is the active signed
+ * contract and passes through untyped.
  */
 export interface UserInfoValue {
-  /** The node's alias. */
+  /** The node's alias; empty unless `State` is `claimed`. */
   NodeAlias: string;
-  /** The user's alias. */
+  /** The user's alias; empty unless `State` is `claimed`. */
   UserAlias: string;
-  /** The active contract's object id (`data1…` string). */
-  ContractID: string;
-  /** The active signed contract — pass-through, shape not imposed. */
-  Contract?: unknown;
+  /** The active contract's object id (`data1…` string); `null` unless `State` is `claimed`. */
+  ContractID: string | null;
+  /** The active signed contract — pass-through, shape not imposed; `null` unless `State` is `claimed`. */
+  Contract: unknown;
+  /**
+   * The node's state, one of the {@link NodeStates}: `fresh`, `unclaimed` or
+   * `claimed`. Kept as sent; empty when the node sent none.
+   */
+  State: string;
+  /** The node's manager, appointed by `apphost.register_manager`; `null` when none is appointed. */
+  Manager: Identity | null;
 }
 
 /**
@@ -201,6 +216,39 @@ function parseWordsResult(
   } catch (err) {
     throw new ProtocolError(`${o.type}: ${(err as Error).message}`);
   }
+}
+
+/** Parse the `user.info` reply, rejecting any other shape with a {@link ProtocolError}. */
+function parseInfo(o: AstralObject): UserInfoValue {
+  if (o.type !== INFO_TYPE) {
+    throw new ProtocolError(`${Ops.info}: unexpected object type ${JSON.stringify(o.type)}`);
+  }
+  const v = o.value;
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) {
+    throw new ProtocolError(`${o.type}: value is not an object`);
+  }
+  const value = v as Record<string, unknown>;
+  const contractID = value.ContractID ?? null;
+  if (contractID !== null && typeof contractID !== 'string') {
+    throw new ProtocolError(`${o.type}: ContractID is neither a string nor null`);
+  }
+  const manager = value.Manager ?? null;
+  let managerID: Identity | null = null;
+  if (manager !== null) {
+    try {
+      managerID = parseIdentity(manager as string);
+    } catch (err) {
+      throw new ProtocolError(`${o.type}: Manager: ${(err as Error).message}`);
+    }
+  }
+  return {
+    NodeAlias: optionalString(o.type, value, 'NodeAlias'),
+    UserAlias: optionalString(o.type, value, 'UserAlias'),
+    ContractID: contractID,
+    Contract: value.Contract ?? null,
+    State: optionalString(o.type, value, 'State'),
+    Manager: managerID,
+  };
 }
 
 /** Parse the `user.bootstrap` reply, rejecting any other shape with a {@link ProtocolError}. */
@@ -464,27 +512,38 @@ export class User {
   }
 
   /**
-   * Read the user this node belongs to.
+   * Read the node's state and manager, and on a claimed node the user this
+   * node belongs to.
    *
    * Sends `user.info` (no arguments) and returns the `value` of the node's
-   * single `mod.user.info` result, shaped like {@link UserInfoValue}: the user
-   * and node aliases plus the active contract and its id.
+   * single `mod.user.info` result, parsed into a {@link UserInfoValue}. The
+   * node answers in every state: `State` tells a `fresh` node (which appoints
+   * a manager with `apphost.register_manager`) from an `unclaimed` one (which
+   * a manager or the node claims with {@link User.bootstrap} or
+   * {@link User.join}) and a `claimed` one; `Manager` is the appointed manager
+   * or `null`. On a `fresh` or `unclaimed` node every caller gets `State` and
+   * `Manager`, and the aliases, `ContractID` and `Contract` are empty. On a
+   * `claimed` node the caller must hold `mod.user.see_swarm_action` (the user
+   * and every node in the same local swarm hold it by default), and the reply
+   * also carries the aliases and the active contract with its id.
    *
-   * The caller must be the user (the active contract's issuer) or another node
-   * in the same local swarm. The node rejects the query (a {@link QueryRejected}
-   * from {@link Host.query}) with code `2` when it has no active contract — the
-   * "no user yet" probe result — and with code `4` when the caller is not
-   * authorized for the info action (`op_info.go`); an accepted query that
-   * yields no object rejects with a {@link ProtocolError}.
+   * The node's gate decides which sessions reach the op; by default it admits
+   * `user.info` in every state, with a token or without, and a refused session
+   * gets a wire `denied` (a {@link Denied} from {@link Host.query}). On a
+   * `claimed` node an unauthorized caller gets an `error_message`
+   * "not permitted", a {@link RemoteError}. An accepted query that yields no
+   * object, or an object other than a well-formed `mod.user.info`, rejects
+   * with a {@link ProtocolError}.
    *
-   * @returns The {@link UserInfoValue} of the node's active user.
+   * @returns The {@link UserInfoValue}: the node's state and manager, plus the
+   *   active user on a claimed node.
    */
   async info(): Promise<UserInfoValue> {
     const objs = await this.host.call(Ops.info);
     if (objs.length === 0) {
       throw new ProtocolError('user.info returned no info');
     }
-    return objs[0]!.value as UserInfoValue;
+    return parseInfo(objs[0]!);
   }
 
   /**
@@ -570,10 +629,10 @@ export class User {
    *
    * LIVE-NODE CAVEAT. The node rejects the query (a {@link QueryRejected} from
    * {@link Host.query}) without a code when its origin is not local. The
-   * node's apphost admits `user.derive_identity` from a session without a
-   * token only while the node is unclaimed, and from a web session without a
-   * token only when its origin is a trusted web source; otherwise the session
-   * gets a wire `denied` (a {@link Denied} from {@link Host.query}). Past the
+   * node's gate admits `user.derive_identity` by default on an `unclaimed` and
+   * a `claimed` node from a session with a token, and refuses it on a `fresh`
+   * node and from a session without a token with a wire `denied` (a
+   * {@link Denied} from {@link Host.query}). Past the
    * accept gate the node streams an `error_message`, surfaced as a
    * {@link RemoteError}, when the words are not valid BIP-39 words, when the
    * node runs without the `bip137sig` module, or when word generation fails.
@@ -618,12 +677,11 @@ export class User {
    * LIVE-NODE CAVEAT. The node rejects the query (a {@link QueryRejected} from
    * {@link Host.query}) without a code when its origin is not local, with code
    * `2` when the node already has an active contract, and with code `4` when
-   * the caller is not the node itself. A caller with no identity counts as the
-   * node: a session without a token has none, and the node's apphost admits
-   * `user.bootstrap` for such sessions only while the node is unclaimed, and
-   * from a web session only when its origin is a trusted web source. On a
-   * claimed node a session without a token gets a wire `denied` (a
-   * {@link Denied} from {@link Host.query}) instead of code `2`. Past the
+   * the caller is neither the node nor the node's manager. The manager calls
+   * with its App token from `apphost.register_manager`. The node's gate admits
+   * `user.bootstrap` by default on an `unclaimed` node from a session with a
+   * token, and refuses it on a `fresh` node and from a session without a token
+   * with a wire `denied` (a {@link Denied} from {@link Host.query}). Past the
    * accept gate the node streams an `error_message`, surfaced as a
    * {@link RemoteError}, when the words are not valid BIP-39 words, when the
    * claim rule of `auth.sign_contract` refuses the user, when the node runs
@@ -657,12 +715,13 @@ export class User {
    *
    * REJECT CODES (each a {@link QueryRejected} from {@link Host.query}): none
    * when the origin is not local; `2` — the node already has an active
-   * contract; `4` — the caller is not the node itself (a caller with no
-   * identity counts as the node); `3` — `node` does not resolve, resolves to
-   * the anonymous identity, or names this node. The node's apphost admits
-   * `user.join` from a session without a token only while the node is
-   * unclaimed, and from a web session only when its origin is a trusted web
-   * source; otherwise the session gets a wire `denied` (a {@link Denied}).
+   * contract; `4` — the caller is neither the node nor the node's manager (a
+   * caller with no identity counts as the node; the manager calls with its
+   * App token); `3` — `node` does not resolve, resolves to the anonymous
+   * identity, or names this node. The node's gate admits `user.join` by
+   * default on an `unclaimed` node from a session with a token, and refuses it
+   * on a `fresh` node and from a session without a token with a wire `denied`
+   * (a {@link Denied}).
    * Past the accept gate the node streams an `error_message`, surfaced as a
    * {@link RemoteError}: `request declined` (the swarm node's join policy),
    * `invitation declined` (this node's invite policy), `query rejected (2)`

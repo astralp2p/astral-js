@@ -42,6 +42,30 @@ export interface RegisterRequestValue {
   ContractPermits: PermitValue[];
 }
 
+/**
+ * One policy a manager decides: the JSON `value` of a
+ * `mod.apphost.policy_binding`, carried in a
+ * {@link RegisterManagerRequestValue}.
+ */
+export interface PolicyBindingValue {
+  /** The policy, one of the `Policies` names. */
+  Policy: string;
+  /** The op the node queries on the manager for each decision. */
+  Operation: string;
+  /** How long the node waits for one answer, in nanoseconds; `0` waits 10 minutes. */
+  Timeout: number;
+}
+
+/**
+ * The input of `apphost.register_manager`: the JSON `value` of a
+ * `mod.apphost.register_manager_request`. `Name`, `GrantPermits` and
+ * `ContractPermits` mean what they mean in a {@link RegisterRequestValue}.
+ */
+export interface RegisterManagerRequestValue extends RegisterRequestValue {
+  /** The policies the manager decides, one binding each. */
+  Policies: PolicyBindingValue[];
+}
+
 /** The input of `apphost.grant`: the JSON `value` of a `mod.apphost.grant_request`. */
 export interface GrantRequestValue {
   /** The identity that receives the grants (a public key, never an alias). */

@@ -70,7 +70,10 @@ same `Session` / `Transport` seam.
   `repositories()→RepositoryInfoValue[]` (the repository tree; `Kind` is
   `repository` or `group` — an empty group looks like a leaf in `Children`).
 - **user** — swarm membership: `newNodeContract(alias)`, `acceptMembership(contract, issuerSig)`, `expel(nodeID)`;
-  status/management: `info()→UserInfoValue`, `adopt(target)`,
+  status/management: `info()→UserInfoValue` (answers in every node state:
+  `State` is `fresh`/`unclaimed`/`claimed` (`NodeStates`), `Manager` the
+  appointed manager or `null`; aliases and contract are empty unless
+  `claimed` — the claim probe, not a rejection), `adopt(target)`,
   `swarmStatus()→SwarmMemberValue[]` (member tag is the plural
   `mod.users.swarm_member`); setup of an unclaimed node:
   `deriveIdentity(words?, {passphrase?})→DeriveIdentityResultValue` (the user
@@ -103,6 +106,11 @@ same `Session` / `Transport` seam.
 - **apphost** (ops, `astral-js/api/apphost` — distinct from the client lib) —
   `register({name?, permits?, contractPermits?})→AccessTokenValue` (mint a
   guest identity + token; streams one `mod.apphost.register_request`),
+  `registerManager({name?, permits?, contractPermits?, policies?})→AccessTokenValue`
+  (appoint the manager of a `fresh` node; streams one
+  `mod.apphost.register_manager_request` whose `Policies` are
+  `mod.apphost.policy_binding` values `{Policy, Operation, Timeout}`, policy
+  names in `Policies`; a node that is not fresh answers `node is not fresh`),
   `grant(identity, permits, {durationMs?})` (streams one
   `mod.apphost.grant_request`, reads `ack`),
   `requestGrant(permits, {durationMs?})` (streams one

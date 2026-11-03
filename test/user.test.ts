@@ -3,7 +3,13 @@ import { Host } from '../src/apphost/index.js';
 import type { Transport } from '../src/apphost/session.js';
 import { parseIdentity, unwrap, type AstralObject } from '../src/astral/index.js';
 import { ProtocolError, QueryRejected, RemoteError } from '../src/astral/errors.js';
-import { BOOTSTRAP_RESULT_TYPE, DERIVE_IDENTITY_RESULT_TYPE, User } from '../src/api/user/index.js';
+import {
+  BOOTSTRAP_RESULT_TYPE,
+  DERIVE_IDENTITY_RESULT_TYPE,
+  INFO_TYPE,
+  NodeStates,
+  User,
+} from '../src/api/user/index.js';
 import { GUEST, NODE, recordingTransport } from './helpers/recording-transport.js';
 
 const PEER = parseIdentity('03' + 'b'.repeat(64));
@@ -33,6 +39,110 @@ describe('User.expel', () => {
 
     expect(routed[0]!.Query).toBe('user.expel?identity=phone');
     expect(expulsion).toEqual(ban);
+  });
+});
+
+const MANAGER = '03' + 'e'.repeat(64);
+
+/** The JSON form the spec gives for mod.user.info on a fresh node. */
+const FRESH_INFO =
+  '{"Type":"mod.user.info","Object":{"NodeAlias":"","UserAlias":"","ContractID":null,"Contract":null,"State":"fresh","Manager":null}}';
+
+describe('User.info', () => {
+  it('decodes the JSON form of a fresh node', async () => {
+    const { transport, routed } = recordingTransport([unwrap(JSON.parse(FRESH_INFO))]);
+
+    const info = await userOn(transport).info();
+
+    expect(routed[0]!.Query).toBe('user.info');
+    expect(info).toEqual({
+      NodeAlias: '',
+      UserAlias: '',
+      ContractID: null,
+      Contract: null,
+      State: NodeStates.fresh,
+      Manager: null,
+    });
+    expect(INFO_TYPE).toBe('mod.user.info');
+  });
+
+  it('decodes the state and manager of an unclaimed node', async () => {
+    const { transport } = recordingTransport([
+      unwrap(
+        JSON.parse(
+          `{"Type":"mod.user.info","Object":{"NodeAlias":"","UserAlias":"","ContractID":null,"Contract":null,"State":"unclaimed","Manager":"${MANAGER}"}}`,
+        ),
+      ),
+    ]);
+
+    const info = await userOn(transport).info();
+
+    expect(info.State).toBe('unclaimed');
+    expect(info.Manager).toBe(MANAGER);
+  });
+
+  it('decodes a claimed node with its user and contract', async () => {
+    const contract = { Issuer: PEER };
+    const { transport } = recordingTransport([
+      {
+        type: 'mod.user.info',
+        value: {
+          NodeAlias: 'phone',
+          UserAlias: 'alice',
+          ContractID: 'data1abc',
+          Contract: contract,
+          State: 'claimed',
+          Manager: MANAGER,
+        },
+      },
+    ]);
+
+    await expect(userOn(transport).info()).resolves.toEqual({
+      NodeAlias: 'phone',
+      UserAlias: 'alice',
+      ContractID: 'data1abc',
+      Contract: contract,
+      State: NodeStates.claimed,
+      Manager: MANAGER,
+    });
+  });
+
+  it('reads absent fields as empty', async () => {
+    const { transport } = recordingTransport([{ type: 'mod.user.info', value: {} }]);
+
+    await expect(userOn(transport).info()).resolves.toEqual({
+      NodeAlias: '',
+      UserAlias: '',
+      ContractID: null,
+      Contract: null,
+      State: '',
+      Manager: null,
+    });
+  });
+
+  it('refuses a malformed Manager, State or ContractID', async () => {
+    for (const bad of [{ Manager: 'phone' }, { State: 7 }, { ContractID: 7 }]) {
+      const { transport } = recordingTransport([{ type: 'mod.user.info', value: bad }]);
+      await expect(userOn(transport).info()).rejects.toBeInstanceOf(ProtocolError);
+    }
+  });
+
+  it('refuses another reply type or none', async () => {
+    const other = recordingTransport([{ type: 'ack', value: null }]);
+    await expect(userOn(other.transport).info()).rejects.toThrow(
+      new ProtocolError('user.info: unexpected object type "ack"'),
+    );
+
+    const none = recordingTransport([]);
+    await expect(userOn(none.transport).info()).rejects.toThrow(
+      new ProtocolError('user.info returned no info'),
+    );
+  });
+
+  it('surfaces not permitted as a RemoteError', async () => {
+    const { transport } = recordingTransport([{ type: 'error_message', value: 'not permitted' }]);
+
+    await expect(userOn(transport).info()).rejects.toThrow(new RemoteError('not permitted'));
   });
 });
 

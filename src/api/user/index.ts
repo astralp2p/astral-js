@@ -434,9 +434,11 @@ export class User {
    * instead of running the signing ceremony, the caller supplies a `signed`
    * contract already signed by BOTH the issuer and the subject, and the node
    * validates, stores, and activates it. This is the setup-time replacement for
-   * a raw `tree.set` of the active-contract path (now a protected op); the node
-   * carries `user.accept_contract` on its pre-user setup allowlist so an
-   * anonymous web guest can complete first-time setup with it.
+   * a raw `tree.set` of the active-contract path (now a protected op). Before
+   * the claim the node's apphost gate decides who may call it: the default
+   * `gate.tokenless` and the `fresh` and `unclaimed` lists of `gate.states`
+   * leave it out, so a session reaches it there only where the node's config
+   * lists it.
    *
    * WIRE — a bidirectional op with no query arguments, following the same
    * send-then-ack shape as `tree.set`: it opens `user.accept_contract`,

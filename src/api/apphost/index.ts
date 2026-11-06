@@ -1,11 +1,13 @@
 // api/apphost — the apphost protocol client (guest registration and grants).
 // Built on the apphost WebSocket client's query. Ops: register,
-// registerManager, grant, requestGrant, listGrants, revoke. Populated by:
-// dev/api-settings-app, dev/apphost-grant-clients, dev/node-manager-bootstrap.
+// grant, requestGrant, listGrants, revoke. Populated by: dev/api-settings-app,
+// dev/apphost-grant-clients. The manager appointment is the sys protocol
+// (`astral-js/api/sys`).
 
 /**
- * The `apphost` protocol client: bootstrap a guest identity on the node,
- * appoint the node's manager, and manage node-local grants.
+ * The `apphost` protocol client: bootstrap a guest identity on the node and
+ * manage node-local grants. The node's manager is appointed with
+ * `sys.register_manager` (`Sys.registerManager` at `astral-js/api/sys`).
  *
  * A thin, typed wrapper over a {@link Host} that speaks the `apphost.*`
  * OPERATIONS (queries routed to the apphost module) — distinct from
@@ -15,14 +17,12 @@
  *
  * Grounded in the protocol spec under `.ai/system/protocols/apphost/`:
  *   - `ops/apphost.register.md` with `types/mod.apphost.register_request.md`;
- *   - `ops/apphost.register_manager.md` with
- *     `types/mod.apphost.{register_manager_request,policy_binding}.md`;
  *   - `ops/apphost.grant.md` with `types/mod.apphost.grant_request.md`;
  *   - `ops/apphost.request_grant.md` with `types/mod.apphost.request_grant_request.md`;
  *   - `ops/apphost.list_grants.md` with `types/mod.apphost.grant.md`;
  *   - `ops/apphost.revoke.md`.
  *
- * `register`, `register_manager`, `grant` and `request_grant` read one input
+ * `register`, `grant` and `request_grant` read one input
  * object on the stream after accept; `list_grants` and `revoke` take query
  * arguments. Grants accumulate: a new grant never replaces an earlier one, and
  * narrowing is granting the narrow permit, then revoking the wide one. The
@@ -40,25 +40,21 @@ import { isAck, isError, obj } from '../../astral/object.js';
 import type { QueryArgs } from '../../astral/encoding.js';
 import { ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
 import { toPermit, type PermitInput, type PermitValue } from '../auth/types.js';
-import { Ops, Types, type PolicyName } from './consts.js';
+import { Ops, Types } from './consts.js';
 import {
   durationNs,
   parseGrant,
   type AccessTokenValue,
   type GrantValue,
-  type PolicyBindingValue,
   type RegisterRequestValue,
 } from './types.js';
 
-export { Ops, Types, Refusals, Policies } from './consts.js';
-export type { PolicyName } from './consts.js';
+export { Ops, Types, Refusals } from './consts.js';
 export { durationNs, grantExpiresAt, parseGrant } from './types.js';
 export type {
   AccessTokenValue,
   GrantRequestValue,
   GrantValue,
-  PolicyBindingValue,
-  RegisterManagerRequestValue,
   RegisterRequestValue,
   RequestGrantRequestValue,
 } from './types.js';
@@ -87,30 +83,6 @@ export interface RegisterOptions {
    * verifies, and cannot be revoked.
    */
   contractPermits?: PermitInput[];
-}
-
-/** One policy the manager decides, for {@link RegisterManagerOptions.policies}. */
-export interface PolicyBinding {
-  /** The policy, one of the {@link Policies} names; sent as `Policy`. */
-  policy: PolicyName;
-  /** The op the node queries on the manager for each decision; sent as `Operation`. */
-  operation: string;
-  /**
-   * How long the node waits for one answer, in milliseconds, sent as
-   * nanoseconds in `Timeout`. Absent or `0` waits 10 minutes; the node refuses
-   * a value above 10 minutes.
-   */
-  timeoutMs?: number;
-}
-
-/** Options for {@link Apphost.registerManager}. */
-export interface RegisterManagerOptions extends RegisterOptions {
-  /**
-   * The policies the manager decides, sent as `Policies`. The node stores a
-   * delegate for each, with the new identity as delegate identity, and clears
-   * the stored delegate of every policy left out.
-   */
-  policies?: PolicyBinding[];
 }
 
 /** The lifetime option of {@link Apphost.grant} and {@link Apphost.requestGrant}. */
@@ -173,9 +145,9 @@ export class Apphost {
    * {@link RemoteError} whose message starts with "invalid permit". The node's
    * gate answers a wire `denied`, a {@link Denied}, where it does not admit the
    * op: by default on a `fresh` node, which appoints a manager first with
-   * {@link Apphost.registerManager}. Any other failure past accept (key
-   * generation, contract signing, token minting) streams an `error_message`, a
-   * {@link RemoteError}.
+   * `sys.register_manager` (`Sys.registerManager` at `astral-js/api/sys`).
+   * Any other failure past accept (key generation, contract signing, token
+   * minting) streams an `error_message`, a {@link RemoteError}.
    *
    * @param opts Optional {@link RegisterOptions}.
    * @returns The minted {@link AccessTokenValue} (`Identity`, `Token`, `ExpiresAt`).
@@ -184,53 +156,6 @@ export class Apphost {
   async register(opts: RegisterOptions = {}): Promise<AccessTokenValue> {
     const request = obj(Types.registerRequest, registerFields(opts));
     return this.sendForToken(Ops.register, request);
-  }
-
-  /**
-   * Provision a fresh App identity as {@link Apphost.register} does and appoint
-   * it the node's manager; return its credentials.
-   *
-   * Opens `apphost.register_manager` with no arguments and streams one
-   * `mod.apphost.register_manager_request` carrying the fields of
-   * {@link Apphost.register} plus {@link RegisterManagerOptions.policies} (as
-   * `Policies`, one `mod.apphost.policy_binding` value each), also for a bare
-   * `registerManager()`, because the op reads one object. The app register
-   * policy is not asked. The node stores a delegate for each named policy with
-   * the new identity as delegate identity, clears the delegate of every policy
-   * left out, records the appointment, and returns the manager's token as the
-   * `value` of a single `apphost.access_token` object. The node is then
-   * `unclaimed`; the manager may claim it with `user.bootstrap` or `user.join`
-   * under this token. Only a `fresh` node appoints a manager. The query must
-   * come from a local origin.
-   *
-   * REFUSAL PATHS. A node that is not fresh (it has a manager, has an active
-   * contract, or has held one before) answers a {@link RemoteError} "node is not fresh"
-   * ({@link Refusals}.notFresh). The node checks the request first: an invalid
-   * permit gets a {@link RemoteError} whose message starts with
-   * "invalid permit"; an unknown or repeated policy, a binding without an
-   * operation, a timeout above 10 minutes, or a `user` policy on a node without
-   * the `user` module gets a {@link RemoteError} naming the policy. A query
-   * from a network origin gets an `error_message`, a {@link RemoteError}. The
-   * node's gate answers a wire `denied`, a {@link Denied}, where it does not
-   * admit the op: by default on an `unclaimed` node. Any later failure streams
-   * an `error_message`, a {@link RemoteError}, and leaves the node `fresh`.
-   *
-   * @param opts Optional {@link RegisterManagerOptions}.
-   * @returns The manager's {@link AccessTokenValue} (`Identity`, `Token`, `ExpiresAt`).
-   * @throws {TypeError} If a permit is malformed; nothing is routed then.
-   * @throws {RangeError} On a negative or fractional timeout; nothing is
-   *   routed then.
-   */
-  async registerManager(opts: RegisterManagerOptions = {}): Promise<AccessTokenValue> {
-    const request = obj(Types.registerManagerRequest, {
-      ...registerFields(opts),
-      Policies: (opts.policies ?? []).map((b): PolicyBindingValue => ({
-        Policy: b.policy,
-        Operation: b.operation,
-        Timeout: durationNs(b.timeoutMs ?? 0),
-      })),
-    });
-    return this.sendForToken(Ops.registerManager, request);
   }
 
   /**

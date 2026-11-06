@@ -86,7 +86,8 @@ import { Dir } from 'astral-js/api/dir';
 import { Crypto } from 'astral-js/api/crypto';
 import { Tree } from 'astral-js/api/tree';
 import { Objects } from 'astral-js/api/objects';
-import { Apphost, Policies } from 'astral-js/api/apphost';
+import { Apphost } from 'astral-js/api/apphost';
+import { Sys, Policies } from 'astral-js/api/sys';
 import { User } from 'astral-js/api/user';
 import { discoveryPermit } from 'astral-js/api/services';
 
@@ -126,7 +127,7 @@ const bp = await objects.getBlueprint('app.message'); // Blueprint
 
 // A fresh node appoints its manager first; user.info reports the node state.
 const { State } = await new User(host).info(); // 'fresh' | 'unclaimed' | 'claimed'
-const manager = await new Apphost(host).registerManager({
+const manager = await new Sys(host).registerManager({
   name: 'control-plane',
   policies: [{ policy: Policies.appRegister, operation: 'cp.approve_app' }],
 });

@@ -120,7 +120,7 @@ export interface UserInfoValue {
    * `claimed`. Kept as sent; empty when the node sent none.
    */
   State: string;
-  /** The node's manager, appointed by `apphost.register_manager`; `null` when none is appointed. */
+  /** The node's manager, the identity `sys.register_manager` appointed; `null` when none is appointed. */
   Manager: Identity | null;
 }
 
@@ -520,7 +520,7 @@ export class User {
    * Sends `user.info` (no arguments) and returns the `value` of the node's
    * single `mod.user.info` result, parsed into a {@link UserInfoValue}. The
    * node answers in every state: `State` tells a `fresh` node (which appoints
-   * a manager with `apphost.register_manager`) from an `unclaimed` one (which
+   * a manager with `sys.register_manager`) from an `unclaimed` one (which
    * a manager or the node claims with {@link User.bootstrap} or
    * {@link User.join}) and a `claimed` one; `Manager` is the appointed manager
    * or `null`. On a `fresh` or `unclaimed` node every caller gets `State` and
@@ -680,7 +680,7 @@ export class User {
    * {@link Host.query}) without a code when its origin is not local, with code
    * `2` when the node already has an active contract, and with code `4` when
    * the caller is neither the node nor the node's manager. The manager calls
-   * with its App token from `apphost.register_manager`. The node's gate admits
+   * with its App token from `sys.register_manager`. The node's gate admits
    * `user.bootstrap` by default on an `unclaimed` node from a session with a
    * token, and refuses it on a `fresh` node and from a session without a token
    * with a wire `denied` (a {@link Denied} from {@link Host.query}). Past the

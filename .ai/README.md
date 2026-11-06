@@ -35,8 +35,8 @@ same `Session` / `Transport` seam.
   `connect` (plus the primitives) as a convenience entry.
 - `src/api/<p>/` — one client class per protocol, each taking a `Host`:
   `Dir` (`astral-js/api/dir`), `Crypto` (`api/crypto`), `Tree` (`api/tree`),
-  `Objects` (`api/objects`). Each method folds args into a query string and
-  decodes the result via astral-core.
+  `Objects` (`api/objects`), `Sys` (`api/sys`), … Each method folds args into
+  a query string and decodes the result via astral-core.
 
 ## Load-bearing invariants (do not break)
 
@@ -72,8 +72,9 @@ same `Session` / `Transport` seam.
 - **user** — swarm membership: `newNodeContract(alias)`, `acceptMembership(contract, issuerSig)`, `expel(nodeID)`;
   status/management: `info()→UserInfoValue` (answers in every node state:
   `State` is `fresh`/`unclaimed`/`claimed` (`NodeStates`), `Manager` the
-  appointed manager or `null`; aliases and contract are empty unless
-  `claimed` — the claim probe, not a rejection), `adopt(target)`,
+  identity `sys.register_manager` appointed, or `null`; aliases and contract
+  are empty unless `claimed` — the claim probe, not a rejection),
+  `adopt(target)`,
   `swarmStatus()→SwarmMemberValue[]` (member tag is the plural
   `mod.users.swarm_member`); setup of an unclaimed node:
   `deriveIdentity(words?, {passphrase?})→DeriveIdentityResultValue` (the user
@@ -106,11 +107,6 @@ same `Session` / `Transport` seam.
 - **apphost** (ops, `astral-js/api/apphost` — distinct from the client lib) —
   `register({name?, permits?, contractPermits?})→AccessTokenValue` (mint a
   guest identity + token; streams one `mod.apphost.register_request`),
-  `registerManager({name?, permits?, contractPermits?, policies?})→AccessTokenValue`
-  (appoint the manager of a `fresh` node; streams one
-  `mod.apphost.register_manager_request` whose `Policies` are
-  `mod.apphost.policy_binding` values `{Policy, Operation, Timeout}`, policy
-  names in `Policies`; a node that is not fresh answers `node is not fresh`),
   `grant(identity, permits, {durationMs?})` (streams one
   `mod.apphost.grant_request`, reads `ack`),
   `requestGrant(permits, {durationMs?})` (streams one
@@ -120,6 +116,16 @@ same `Session` / `Transport` seam.
   `revoke(identity, {id} | {action})`. Refusals are `RemoteError`s whose
   messages are listed in `Refusals`. `discoveryPermit(services)` (at
   `api/services`) builds a scoped discovery permit.
+- **sys** (`astral-js/api/sys`) — the node's lifecycle (state and manager):
+  `registerManager({name?, permits?, contractPermits?, policies?})→AccessTokenValue`
+  (`sys.register_manager`: appoint the manager of a `fresh` node; streams one
+  `mod.sys.register_manager_request` whose `Policies` are
+  `mod.sys.policy_binding` values `{Policy, Operation, Timeout}`, policy
+  names in `Policies`; a node that is not fresh answers `node is not fresh`,
+  `Refusals.notFresh`). The default gate lists `sys.register_manager` in
+  `gate.tokenless` and `gate.states.fresh`. The manager holds
+  `mod.auth.configure_node_state_action` in every node state, which every
+  policy setter requires. Hard rename: there is no `apphost.register_manager`.
 
 Method names mirror the op strings (camelCase of the op's operation segment):
 `user.new_node_contract`→`newNodeContract`, `dir.resolve`→`resolve`, etc. The three

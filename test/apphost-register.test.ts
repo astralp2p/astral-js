@@ -3,7 +3,7 @@ import { Host } from '../src/apphost/index.js';
 import type { Transport } from '../src/apphost/session.js';
 import { parseIdentity, type AstralObject } from '../src/astral/index.js';
 import { ProtocolError, QueryRejected, RemoteError } from '../src/astral/errors.js';
-import { Apphost, Policies, Refusals } from '../src/api/apphost/index.js';
+import { Apphost } from '../src/api/apphost/index.js';
 import { discoveryPermit } from '../src/api/services/index.js';
 import { GUEST, NODE, recordingTransport } from './helpers/recording-transport.js';
 
@@ -152,94 +152,5 @@ describe('Apphost.register', () => {
 
     await expect(apphostOn(transport).register()).rejects.toThrow(QueryRejected);
     expect(closes()).toBe(1);
-  });
-});
-
-describe('Apphost.registerManager', () => {
-  it('streams one register_manager_request and returns the manager token', async () => {
-    const { transport, routed, streamed, closes } = recordingTransport([TOKEN_REPLY]);
-
-    const token = await apphostOn(transport).registerManager({
-      name: 'control-plane',
-      permits: ['mod.user.see_swarm_action'],
-      policies: [
-        { policy: Policies.appRegister, operation: 'cp.approve_app' },
-        { policy: Policies.swarmJoin, operation: 'cp.approve_join', timeoutMs: 300000 },
-      ],
-    });
-
-    expect(token).toEqual(TOKEN);
-    expect(routed[0]!.Query).toBe('apphost.register_manager');
-    expect(streamed).toEqual([
-      {
-        type: 'mod.apphost.register_manager_request',
-        value: {
-          Name: 'control-plane',
-          GrantPermits: [{ Action: 'mod.user.see_swarm_action', Constraints: null, Delegation: 0 }],
-          ContractPermits: [],
-          Policies: [
-            { Policy: 'app_register', Operation: 'cp.approve_app', Timeout: 0 },
-            { Policy: 'swarm_join', Operation: 'cp.approve_join', Timeout: 300000000000 },
-          ],
-        },
-      },
-    ]);
-    expect(closes()).toBe(1);
-  });
-
-  it('streams an empty request for a bare registerManager()', async () => {
-    const { transport, streamed } = recordingTransport([TOKEN_REPLY]);
-
-    await apphostOn(transport).registerManager();
-
-    expect(streamed).toEqual([
-      {
-        type: 'mod.apphost.register_manager_request',
-        value: { Name: '', GrantPermits: [], ContractPermits: [], Policies: [] },
-      },
-    ]);
-  });
-
-  it('names the five policies', () => {
-    expect(Object.values(Policies)).toEqual([
-      'app_register',
-      'grant_request',
-      'swarm_join',
-      'swarm_invite',
-      'contract_accept',
-    ]);
-  });
-
-  it('refuses a malformed permit or timeout before routing', async () => {
-    const { transport, routed } = recordingTransport([TOKEN_REPLY]);
-    const apphost = apphostOn(transport);
-
-    await expect(apphost.registerManager({ permits: [''] })).rejects.toThrow(TypeError);
-    await expect(
-      apphost.registerManager({
-        policies: [{ policy: Policies.appRegister, operation: 'x', timeoutMs: -1 }],
-      }),
-    ).rejects.toThrow(RangeError);
-    expect(routed).toHaveLength(0);
-  });
-
-  it('surfaces node is not fresh as a RemoteError', async () => {
-    const { transport, closes } = recordingTransport([
-      { type: 'error_message', value: 'node is not fresh' },
-    ]);
-
-    await expect(apphostOn(transport).registerManager()).rejects.toThrow(
-      new RemoteError(Refusals.notFresh),
-    );
-    expect(Refusals.notFresh).toBe('node is not fresh');
-    expect(closes()).toBe(1);
-  });
-
-  it('refuses a stream that ends without a token', async () => {
-    const { transport } = recordingTransport([]);
-
-    await expect(apphostOn(transport).registerManager()).rejects.toThrow(
-      new ProtocolError('apphost.register_manager returned no access token'),
-    );
   });
 });

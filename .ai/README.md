@@ -93,7 +93,8 @@ same `Session` / `Transport` seam.
   node's swarm. Names travel as one comma-separated `services` argument. No
   re-advertise after a disconnect: the app opens a new binding.
 - **nearby** — LAN discovery: `broadcast()`, `list()→AstralObject[]` of
-  `mod.nearby.status` (alias travels inside the `Attachments` bundle).
+  `mod.nearby.status` (`Identity` is `null` for a Stealth peer no recognizer
+  matched; alias travels inside the `Attachments` bundle).
 - **nodes** — links and endpoints: `links()→AstralObject[]` of
   `mod.nodes.link_info` (a fact about now), `resolveEndpoints(id)→AstralObject[]`
   of `mod.nodes.endpoint_with_ttl` (a fact about the past; empty is an answer,

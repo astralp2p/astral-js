@@ -27,6 +27,7 @@ export default defineConfig({
     'api/nodes/index': 'src/api/nodes/index.ts',
     'api/bip137sig/index': 'src/api/bip137sig/index.ts',
     'api/apphost/index': 'src/api/apphost/index.ts',
+    'api/sys/index': 'src/api/sys/index.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

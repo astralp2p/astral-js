@@ -35,8 +35,15 @@ import type { Identity } from '../../astral/identity.js';
  * (endpoints, public profile, …) and is intentionally left untyped.
  */
 export interface NearbyStatusValue {
-  /** The peer's node identity (66-hex string). */
-  Identity: Identity;
+  /**
+   * The peer's node identity (66-hex string), as the node established it: the
+   * node a recognizer matched, or the `NodeID` of the peer's
+   * `mod.nearby.public_profile`. `null` for a Stealth status that no
+   * recognizer matched (for example a Stealth node of another user): such a
+   * status passed no proof check, and the node keeps only its source IP and
+   * its attachments, as received.
+   */
+  Identity: Identity | null;
   /** The peer's attachment bundle — pass-through, shape not imposed. */
   Attachments?: unknown;
 }
@@ -52,6 +59,7 @@ export interface NearbyStatusValue {
  * await nearby.broadcast();                    // announce our presence
  * for (const status of await nearby.list()) {  // read the peer cache
  *   const v = status.value as NearbyStatusValue;
+ *   if (v.Identity === null) continue;         // an unrecognised Stealth peer
  *   console.log(v.Identity);
  * }
  * ```
@@ -83,7 +91,8 @@ export class Nearby {
    * Sends `nearby.list`; the node prunes expired cache entries, then streams
    * one `mod.nearby.status` object per known peer, terminated by `eos`. Each
    * status is returned verbatim as an {@link AstralObject} whose `value` is
-   * shaped like {@link NearbyStatusValue}. An encoding failure streams an
+   * shaped like {@link NearbyStatusValue}; its `Identity` is `null` for a
+   * Stealth peer the node does not recognise. An encoding failure streams an
    * `error_message`, surfaced as a {@link RemoteError} by {@link Host.call}.
    *
    * The cache is passive: a fresh scan is `broadcast()` (peers answer with

@@ -205,8 +205,8 @@ export class Apphost {
    * host must be connected with the requester's access token: the grantee is
    * the session's identity. Any requester may ask. The node always asks its
    * grant-request policy, even for permits already held: a stored delegate
-   * decides; otherwise an unset mode or `accept_all` approves, and `reject_all`
-   * or any other stored mode refuses. The call waits while a delegate decides,
+   * decides; otherwise the node's `policies.grant_request` config value
+   * decides, `reject_all` by default. The call waits while a delegate decides,
    * so the stream stays open until the answer. An approval writes each permit
    * with its constraints and the requested expiry.
    *

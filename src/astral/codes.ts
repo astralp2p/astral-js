@@ -18,6 +18,10 @@ export const CodeInvalidQuery = 2;
 export const CodeCanceled = 3;
 /** An internal error occurred. */
 export const CodeInternalError = 4;
+/** The query was not answered in time; routing produces it too. */
+export const CodeTimeout = 6;
+/** The target or the next hop could not be reached; routing produces it too. */
+export const CodeUnavailable = 7;
 
 /** The reject code used when a handler declines a query without a specific code. */
 export const DefaultRejectCode = CodeRejected;

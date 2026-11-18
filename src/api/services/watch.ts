@@ -53,7 +53,8 @@ export class Watcher {
   private readonly backoff: Backoff | null;
   private events: DiscoveryStream | null;
   private staging: Map<string, ServiceUpdateValue | null> | null = null;
-  private isStale = false;
+  /** Shown keys an incomplete boundary kept without the reopened follow showing them. */
+  private unconfirmed = new Set<string>();
   private settled = false;
   private closed = false;
   private wake: (() => void) | null = null;
@@ -91,10 +92,11 @@ export class Watcher {
   /**
    * True from the end of a stream until a reopened follow's complete
    * boundary. An incomplete boundary keeps the offerings it did not show, and
-   * the set stays stale.
+   * the set stays stale until each of them is updated or removed, or a later
+   * boundary is complete.
    */
   stale(): boolean {
-    return this.isStale;
+    return this.staging !== null || this.unconfirmed.size > 0;
   }
 
   /** Call `listener` after every change to {@link Watcher.offerings}. Returns an unsubscribe. */
@@ -131,11 +133,15 @@ export class Watcher {
     }
     switch (ev.kind) {
       case 'update':
+        this.unconfirmed.delete(offeringKey(ev.update));
         if (ev.update.Available) this.current.set(offeringKey(ev.update), ev.update);
         else this.current.delete(offeringKey(ev.update));
         break;
       case 'removed':
-        for (const k of ev.offerings) this.current.delete(offeringKey(k));
+        for (const k of ev.offerings) {
+          this.unconfirmed.delete(offeringKey(k));
+          this.current.delete(offeringKey(k));
+        }
         break;
     }
     this.notify(this.listeners);
@@ -166,10 +172,12 @@ export class Watcher {
       if (u?.Available) this.current.set(k, u);
       else this.current.delete(k);
     }
-    if (outcome.complete) {
-      for (const k of [...this.current.keys()]) if (!staging.has(k)) this.current.delete(k);
+    this.unconfirmed = new Set();
+    for (const k of [...this.current.keys()]) {
+      if (staging.has(k)) continue;
+      if (outcome.complete) this.current.delete(k);
+      else this.unconfirmed.add(k);
     }
-    this.isStale = !outcome.complete;
     this.staging = null;
   }
 
@@ -228,8 +236,7 @@ export class Watcher {
   }
 
   private reopen(): void {
-    const turned = !this.isStale;
-    this.isStale = true;
+    const turned = !this.stale();
     this.staging = new Map();
     if (turned) this.notify(this.listeners);
   }

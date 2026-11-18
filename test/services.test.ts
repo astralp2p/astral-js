@@ -251,21 +251,23 @@ describe('Services.watch with reconnect', () => {
     await w.done;
   });
 
-  it('keeps unseen offerings after an incomplete boundary and stays stale', async () => {
-    const { services } = scriptedQueries(
-      follow(offer(PROVIDER), offer(OTHER), eos, null),
-      follow(
-        offer(PROVIDER),
-        { type: 'services.incomplete', value: { Services: ['player'] } },
-        eos,
-      ),
+  it('keeps unseen offerings after an incomplete boundary until they are shown again', async () => {
+    const second = follow(
+      offer(PROVIDER),
+      { type: 'services.incomplete', value: { Services: ['player'] } },
+      eos,
     );
+    const { services } = scriptedQueries(follow(offer(PROVIDER), offer(OTHER), eos, null), second);
     const w = await services.watch(['player'], { reconnect: { minMs: 1 } });
     let synced = 0;
     w.onSynced(() => synced++);
     await until(() => synced === 2);
     expect(w.offerings().length).toBe(2);
     expect(w.stale()).toBe(true);
+
+    second.push(offer(OTHER));
+    await until(() => !w.stale());
+    expect(w.offerings().length).toBe(2);
     w.close();
     await w.done;
   });

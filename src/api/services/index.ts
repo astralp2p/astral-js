@@ -5,7 +5,7 @@
 import type { Host } from '../../apphost/host.js';
 import { advertise, type Binding, type OfferingHandler } from './advertise.js';
 import { discover, type DiscoverOptions, type DiscoveryStream } from './discover.js';
-import { watch, type Watcher } from './watch.js';
+import { watch, type Watcher, type WatchOptions } from './watch.js';
 
 export { Ops, Types, UPDATE_TYPE, MAX_NAMES } from './consts.js';
 export { joinNames, validateName } from './names.js';
@@ -26,7 +26,7 @@ export {
   type Reach,
 } from './discover.js';
 export { advertise, Binding, type Offering, type OfferingHandler } from './advertise.js';
-export { watch, Watcher } from './watch.js';
+export { watch, Watcher, type WatchOptions, type ReconnectOptions } from './watch.js';
 
 /**
  * A client for the node's `services` protocol, bound to a connected
@@ -66,7 +66,7 @@ export class Services {
   }
 
   /** See {@link watch}. */
-  watch(names: readonly string[], opts: DiscoverOptions = {}): Promise<Watcher> {
+  watch(names: readonly string[], opts: WatchOptions = {}): Promise<Watcher> {
     return watch(this.host, names, opts);
   }
 }

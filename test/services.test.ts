@@ -182,6 +182,129 @@ describe('Services.watch', () => {
   });
 });
 
+/** A host whose n-th query gets sessions[n]; later queries are refused by a closed socket. */
+function scriptedQueries(...sessions: ScriptedSession[]) {
+  let n = 0;
+  const transport: Transport = {
+    async open(): Promise<Session> {
+      const s = sessions[n++];
+      if (!s) {
+        const closed = new ScriptedSession();
+        closed.end();
+        return closed as unknown as Session;
+      }
+      return s as unknown as Session;
+    },
+  };
+  return { services: new Services(new Host(transport, NODE, 'node', GUEST)), opened: () => n };
+}
+
+function follow(...replies: Array<AstralObject | null>): ScriptedSession {
+  const s = new ScriptedSession();
+  s.push({ type: MessageTypes.QueryAccepted, value: {} });
+  for (const r of replies) s.push(r);
+  return s;
+}
+
+const offer = (provider: string): AstralObject => ({
+  type: 'services.update',
+  value: { Available: true, Name: 'player', ProviderID: provider, Info: null },
+});
+const OTHER = parseIdentity('03' + 'e'.repeat(64));
+
+async function until(cond: () => boolean, ms = 2000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!cond()) {
+    if (Date.now() > end) throw new Error('condition not met in time');
+    await new Promise((r) => setTimeout(r, 2));
+  }
+}
+
+describe('Services.watch with reconnect', () => {
+  it('reopens after an EOF and applies the difference in one change per boundary', async () => {
+    const second = follow(offer(PROVIDER));
+    const { services, opened } = scriptedQueries(
+      follow(offer(PROVIDER), offer(OTHER), eos, null),
+      second,
+    );
+    const w = await services.watch(['player'], { reconnect: { minMs: 1, maxMs: 4 } });
+    let changes = 0;
+    let synced = 0;
+    w.onChange(() => changes++);
+    w.onSynced(() => synced++);
+
+    expect(await w.initial).toEqual({ complete: true, incomplete: [] });
+    await until(() => opened() === 2 && w.stale());
+    expect(w.offerings().length).toBe(2);
+    changes = 0;
+    await tick();
+    expect(changes).toBe(0);
+    expect(w.offerings().length).toBe(2);
+
+    second.push(eos);
+    await until(() => synced === 2);
+    expect(w.offerings().map((o) => o.ProviderID)).toEqual([PROVIDER]);
+    expect(w.stale()).toBe(false);
+    expect(changes).toBe(1);
+
+    w.close();
+    await w.done;
+  });
+
+  it('keeps unseen offerings after an incomplete boundary until they are shown again', async () => {
+    const second = follow(
+      offer(PROVIDER),
+      { type: 'services.incomplete', value: { Services: ['player'] } },
+      eos,
+    );
+    const { services } = scriptedQueries(follow(offer(PROVIDER), offer(OTHER), eos, null), second);
+    const w = await services.watch(['player'], { reconnect: { minMs: 1 } });
+    let synced = 0;
+    w.onSynced(() => synced++);
+    await until(() => synced === 2);
+    expect(w.offerings().length).toBe(2);
+    expect(w.stale()).toBe(true);
+
+    second.push(offer(OTHER));
+    await until(() => !w.stale());
+    expect(w.offerings().length).toBe(2);
+    w.close();
+    await w.done;
+  });
+
+  it('stops on a refusal of the first follow', async () => {
+    const { services, opened } = scriptedQueries(
+      follow({ type: 'error_message', value: 'not permitted' }),
+    );
+    const w = await services.watch(['player'], { reconnect: { minMs: 1 } });
+    await expect(w.initial).rejects.toBeInstanceOf(RemoteError);
+    await expect(w.done).rejects.toBeInstanceOf(RemoteError);
+    expect(opened()).toBe(1);
+  });
+
+  it('retries a refusal of a later follow', async () => {
+    const third = follow(eos);
+    const { services, opened } = scriptedQueries(
+      follow(eos, null),
+      follow({ type: 'error_message', value: 'services not ready' }),
+      third,
+    );
+    const w = await services.watch(['player'], { reconnect: { minMs: 1 } });
+    let synced = 0;
+    w.onSynced(() => synced++);
+    await until(() => synced === 2);
+    expect(opened()).toBe(3);
+    w.close();
+    await w.done;
+  });
+
+  it('checks the names before any query', async () => {
+    const { services, opened } = scriptedQueries();
+    await expect(services.watch([], { reconnect: true })).rejects.toThrow();
+    expect(opened()).toBe(0);
+  });
+});
+
 describe('Services.advertise', () => {
   it('answers each ask from its handler', async () => {
     const { session, services } = scripted(ack);

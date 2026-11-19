@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Host, MessageTypes } from '../src/apphost/index.js';
 import type { Session, Transport } from '../src/apphost/session.js';
-import { parseIdentity, type AstralObject } from '../src/astral/index.js';
-import { RemoteError } from '../src/astral/errors.js';
+import { parseIdentity, unwrap, type AstralObject } from '../src/astral/index.js';
+import { ProtocolError, RemoteError } from '../src/astral/errors.js';
 import { Services, StreamEnded, joinNames } from '../src/api/services/index.js';
 
 const NODE = parseIdentity('02' + 'a'.repeat(64));
@@ -121,7 +121,7 @@ describe('Services.discover', () => {
   it('continues past the outcome when following', async () => {
     const { session, services } = scripted(eos, update('player'), {
       type: 'services.removed',
-      value: { Offerings: [{ ProviderID: PROVIDER, Name: 'player' }] },
+      value: { Offerings: [{ ProviderID: PROVIDER, Name: 'player' }], Cause: 1 },
     });
     session.end();
     const kinds: string[] = [];
@@ -132,6 +132,90 @@ describe('Services.discover', () => {
     ).rejects.toBeInstanceOf(StreamEnded);
     expect(session.query).toBe('services.discover?services=player&follow=true');
     expect(kinds).toEqual(['initial', 'update', 'removed']);
+  });
+});
+
+/**
+ * A `services.removed` as astral-go encodes it to JSON: `json.Marshal` of
+ * `services.Removed{Cause: CauseMemberLost}` in its wire envelope.
+ */
+const GO_REMOVED =
+  '{"Type":"services.removed","Object":{"Cause":1,"Offerings":[{"Name":"player","ProviderID":"03dde03b7692dac2b14229036e1c24aba0f582bed3ceaad3436e6a2b84003b18d0"}]}}';
+
+describe('Services.discover removal causes', () => {
+  it('reads the cause of a Go-encoded services.removed', async () => {
+    const { session, services } = scripted(eos, unwrap(JSON.parse(GO_REMOVED)));
+    session.end();
+    const events: unknown[] = [];
+    await expect(
+      (async () => {
+        for await (const e of await services.discover(['player'], true)) events.push(e);
+      })(),
+    ).rejects.toBeInstanceOf(StreamEnded);
+    expect(events[1]).toEqual({
+      kind: 'removed',
+      offerings: [
+        {
+          Name: 'player',
+          ProviderID: '03dde03b7692dac2b14229036e1c24aba0f582bed3ceaad3436e6a2b84003b18d0',
+        },
+      ],
+      cause: 'member_lost',
+    });
+  });
+
+  it('names every cause value and marks an undefined one unknown', async () => {
+    const causes: string[] = [];
+    for (const c of [1, 2, 3, 4, 5, 9]) {
+      const { session, services } = scripted(eos, {
+        type: 'services.removed',
+        value: { Offerings: [{ ProviderID: PROVIDER, Name: 'player' }], Cause: c },
+      });
+      session.end();
+      try {
+        for await (const e of await services.discover(['player'], true)) {
+          if (e.kind === 'removed') causes.push(e.cause);
+        }
+      } catch {
+        // the scripted stream ends with StreamEnded
+      }
+    }
+    expect(causes).toEqual([
+      'member_lost',
+      'member_left',
+      'member_removed',
+      'binding_closed',
+      'hidden',
+      'unknown',
+    ]);
+  });
+
+  it('rejects a services.removed without a cause', async () => {
+    const { services } = scripted(eos, {
+      type: 'services.removed',
+      value: { Offerings: [{ ProviderID: PROVIDER, Name: 'player' }] },
+    });
+    await expect(collect(await services.discover(['player'], true))).rejects.toBeInstanceOf(
+      ProtocolError,
+    );
+  });
+
+  it('reads services.not_granted and services.tagged_update', async () => {
+    const { services } = scripted(
+      { type: 'services.not_granted', value: { Services: ['bitcoin-wallet'] } },
+      {
+        type: 'services.tagged_update',
+        value: {
+          Open: false,
+          Update: { Available: true, Name: 'player', ProviderID: PROVIDER, Info: null },
+        },
+      },
+      eos,
+    );
+    const events = await collect(await services.discover(['player']));
+    expect(events.map((e) => e.kind)).toEqual(['not_granted', 'update', 'initial']);
+    expect(events[0]).toEqual({ kind: 'not_granted', services: ['bitcoin-wallet'] });
+    expect(events[1]).toMatchObject({ kind: 'update', open: false, update: { Name: 'player' } });
   });
 });
 
@@ -298,10 +382,65 @@ describe('Services.watch with reconnect', () => {
     await w.done;
   });
 
+  it('keeps the node cause of a staged removal and marks a left-out offering unknown', async () => {
+    const second = follow(
+      offer(PROVIDER),
+      {
+        type: 'services.removed',
+        value: { Offerings: [{ ProviderID: PROVIDER, Name: 'player' }], Cause: 1 },
+      },
+      eos,
+    );
+    const { services } = scriptedQueries(follow(offer(PROVIDER), offer(OTHER), eos, null), second);
+    const w = await services.watch(['player'], { reconnect: { minMs: 1 } });
+    let synced = 0;
+    w.onSynced(() => synced++);
+    await until(() => synced === 2);
+    expect(w.offerings()).toEqual([]);
+    const causes = Object.fromEntries(w.removals().map((r) => [r.offering.ProviderID, r.cause]));
+    expect(causes).toEqual({ [PROVIDER]: 'member_lost', [OTHER]: 'unknown' });
+    w.close();
+    await w.done;
+  });
+
   it('checks the names before any query', async () => {
     const { services, opened } = scriptedQueries();
     await expect(services.watch([], { reconnect: true })).rejects.toThrow();
     expect(opened()).toBe(0);
+  });
+});
+
+describe('Services.watch removals', () => {
+  it('keeps each removed offering with its cause until it is offered again', async () => {
+    const { session, services } = scripted(
+      { type: 'services.not_granted', value: { Services: ['bitcoin-wallet'] } },
+      update('player'),
+      eos,
+    );
+    const w = await services.watch(['player']);
+    await w.initial;
+    expect(w.notGranted()).toEqual(['bitcoin-wallet']);
+
+    session.push({
+      type: 'services.removed',
+      value: { Offerings: [{ ProviderID: PROVIDER, Name: 'player' }], Cause: 1 },
+    });
+    await tick();
+    expect(w.offerings()).toEqual([]);
+    expect(w.removals()).toEqual([
+      {
+        offering: { Available: true, Name: 'player', ProviderID: PROVIDER, Info: null },
+        cause: 'member_lost',
+      },
+    ]);
+
+    session.push(update('player'));
+    await tick();
+    expect(w.removals()).toEqual([]);
+    expect(w.offerings().map((o) => o.Name)).toEqual(['player']);
+
+    w.close();
+    await w.done;
   });
 });
 

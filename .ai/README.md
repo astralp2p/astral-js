@@ -89,8 +89,9 @@ same `Session` / `Transport` seam.
 - **auth** — permission contracts: `signContract(contract)`.
 - **services** — provider: `advertise(handlers)→Binding` (`{ [service]: (caller) => Offering | null }`;
   `change(...callers)`, `changeAll()`, `close()`, `done`); consumer: `discover(names, follow?)→DiscoveryStream`
-  of `update` / `removed` / `initial` events, and `watch(names)→Watcher` (`offerings()`, `initial`,
-  `onChange`, `done`, `close`). `{ reach: 'swarm' }` on discover/watch carries the discovery to the
+  of `not_granted` / `update` / `removed` / `initial` events (a `removed` names its `cause`), and
+  `watch(names)→Watcher` (`offerings()`, `removals()`, `notGranted()`, `initial`, `onChange`, `done`,
+  `close`). `{ reach: 'swarm' }` on discover/watch carries the discovery to the
   node's swarm. Names travel as one comma-separated `services` argument. No
   re-advertise after a disconnect: the app opens a new binding.
 - **nearby** — LAN discovery: `broadcast()`, `list()→AstralObject[]` of

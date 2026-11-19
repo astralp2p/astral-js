@@ -6,7 +6,12 @@ import { isEos, isError } from '../../astral/object.js';
 import { AstralError, ProtocolError, RemoteError, readErrorMessage } from '../../astral/errors.js';
 import { Ops, Types } from './consts.js';
 import { joinNames } from './names.js';
-import type { DiscoveryEvent, OfferingKeyValue, ServiceUpdateValue } from './types.js';
+import {
+  RemovalCauses,
+  type DiscoveryEvent,
+  type RemovedValue,
+  type ServiceUpdateValue,
+} from './types.js';
 
 /**
  * Thrown when a discovery stream closes where the protocol does not end it:
@@ -41,7 +46,8 @@ export type Reach = 'local' | 'swarm';
 /**
  * Discover `names` for this app on the host's node.
  *
- * Yields each offering view, each removal, and one `initial` event when the
+ * Yields the `not_granted` services first when there are any, then each
+ * offering view, each removal with its cause, and one `initial` event when the
  * initial attempt ends. Without `follow` the iterable completes after the
  * `initial` event; with `follow` it continues until the caller stops iterating.
  * A refusal or a stream that ends early throws from the iteration.
@@ -87,12 +93,29 @@ async function* readDiscovery(
         case Types.update:
           yield { kind: 'update', update: o.value as ServiceUpdateValue };
           break;
-        case Types.removed:
+        case Types.taggedUpdate: {
+          const t = o.value as { Open: boolean; Update: ServiceUpdateValue | null };
+          if (!t.Update) throw new ProtocolError('services.tagged_update without an update');
+          yield { kind: 'update', update: t.Update, open: t.Open };
+          break;
+        }
+        case Types.notGranted:
           yield {
-            kind: 'removed',
-            offerings: (o.value as { Offerings: OfferingKeyValue[] | null }).Offerings ?? [],
+            kind: 'not_granted',
+            services: (o.value as { Services: string[] | null }).Services ?? [],
           };
           break;
+        case Types.removed: {
+          const r = o.value as RemovedValue;
+          if (typeof r.Cause !== 'number')
+            throw new ProtocolError('services.removed without a cause');
+          yield {
+            kind: 'removed',
+            offerings: r.Offerings ?? [],
+            cause: RemovalCauses[r.Cause] ?? 'unknown',
+          };
+          break;
+        }
         case Types.incomplete:
           incomplete = (o.value as { Services: string[] | null }).Services ?? [];
           break;

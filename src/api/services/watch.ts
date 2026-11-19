@@ -8,8 +8,20 @@ import {
   offeringKey,
   type DiscoveryEvent,
   type InitialOutcome,
+  type RemovalCause,
   type ServiceUpdateValue,
 } from './types.js';
+
+/** An offering the discovery removed and has not offered again. */
+export interface Removal {
+  /** The last view shown before the removal. */
+  offering: ServiceUpdateValue;
+  /**
+   * Why the node removed it; `unknown` also when a reopened follow's complete
+   * boundary no longer shows it.
+   */
+  cause: RemovalCause;
+}
 
 /** The waits between reopened follows, in milliseconds. */
 export interface ReconnectOptions {
@@ -47,12 +59,17 @@ interface Backoff {
  */
 export class Watcher {
   private readonly current = new Map<string, ServiceUpdateValue>();
+  private readonly removed = new Map<string, Removal>();
+  private ungranted: string[] = [];
   private readonly listeners = new Set<() => void>();
   private readonly syncedListeners = new Set<() => void>();
   private readonly open: Open;
   private readonly backoff: Backoff | null;
   private events: DiscoveryStream | null;
   private staging: Map<string, ServiceUpdateValue | null> | null = null;
+  /** The cause of each key the staged follow removed. */
+  private stagedCause = new Map<string, RemovalCause>();
+  private stagedNG: string[] | null = null;
   /** Shown keys an incomplete boundary kept without the reopened follow showing them. */
   private unconfirmed = new Set<string>();
   private settled = false;
@@ -99,6 +116,32 @@ export class Watcher {
     return this.staging !== null || this.unconfirmed.size > 0;
   }
 
+  /**
+   * The offerings the discovery removed and has not offered again, each with
+   * the cause of its removal. An app can show a `member_lost` removal as
+   * reconnecting, since the node retries that member. With `reconnect`, an
+   * offering a reopened follow's complete boundary no longer shows is a
+   * removal with cause `unknown`.
+   *
+   * A removal stays until the discovery offers its key again. A `member_lost`
+   * removal is not superseded when the member later leaves the swarm: the
+   * node sends no `member_left` for keys it no longer shows, so the removal
+   * keeps `member_lost`. An app that shows reconnecting bounds it with its own
+   * timeout. The list grows with every key removed and never offered again
+   * over the watcher's life.
+   */
+  removals(): Removal[] {
+    return [...this.removed.values()];
+  }
+
+  /**
+   * The watched services the caller holds no discovery permit for on some
+   * contributing node; their private offerings there are filtered.
+   */
+  notGranted(): string[] {
+    return [...this.ungranted];
+  }
+
   /** Call `listener` after every change to {@link Watcher.offerings}. Returns an unsubscribe. */
   onChange(listener: () => void): () => void {
     this.listeners.add(listener);
@@ -134,14 +177,18 @@ export class Watcher {
     switch (ev.kind) {
       case 'update':
         this.unconfirmed.delete(offeringKey(ev.update));
+        this.removed.delete(offeringKey(ev.update));
         if (ev.update.Available) this.current.set(offeringKey(ev.update), ev.update);
         else this.current.delete(offeringKey(ev.update));
         break;
       case 'removed':
         for (const k of ev.offerings) {
           this.unconfirmed.delete(offeringKey(k));
-          this.current.delete(offeringKey(k));
+          this.remove(offeringKey(k), ev.cause);
         }
+        break;
+      case 'not_granted':
+        this.ungranted = ev.services;
         break;
     }
     this.notify(this.listeners);
@@ -150,7 +197,21 @@ export class Watcher {
   private stage(ev: DiscoveryEvent): void {
     const staging = this.staging!;
     if (ev.kind === 'update') staging.set(offeringKey(ev.update), ev.update);
-    if (ev.kind === 'removed') for (const k of ev.offerings) staging.set(offeringKey(k), null);
+    if (ev.kind === 'removed') {
+      for (const k of ev.offerings) {
+        staging.set(offeringKey(k), null);
+        this.stagedCause.set(offeringKey(k), ev.cause);
+      }
+    }
+    if (ev.kind === 'not_granted') this.stagedNG = ev.services;
+  }
+
+  /** Drops a shown offering and keeps it as a removal; a key not shown leaves none. */
+  private remove(key: string, cause: RemovalCause): void {
+    const shown = this.current.get(key);
+    if (!shown) return;
+    this.removed.set(key, { offering: shown, cause });
+    this.current.delete(key);
   }
 
   private boundary(outcome: InitialOutcome): void {
@@ -168,17 +229,28 @@ export class Watcher {
   // incomplete outcome may belong to a member that did not answer in time.
   private settle(outcome: InitialOutcome): void {
     const staging = this.staging!;
+    this.ungranted = this.stagedNG ?? [];
     for (const [k, u] of staging) {
-      if (u?.Available) this.current.set(k, u);
-      else this.current.delete(k);
+      if (u?.Available) {
+        this.current.set(k, u);
+        this.removed.delete(k);
+      } else if (u) {
+        // the provider's own unavailable answer is no removal, as in apply
+        this.current.delete(k);
+        this.removed.delete(k);
+      } else {
+        this.remove(k, this.stagedCause.get(k) ?? 'unknown');
+      }
     }
     this.unconfirmed = new Set();
     for (const k of [...this.current.keys()]) {
       if (staging.has(k)) continue;
-      if (outcome.complete) this.current.delete(k);
+      if (outcome.complete) this.remove(k, 'unknown');
       else this.unconfirmed.add(k);
     }
     this.staging = null;
+    this.stagedCause = new Map();
+    this.stagedNG = null;
   }
 
   private notify(listeners: Set<() => void>): void {
@@ -238,6 +310,8 @@ export class Watcher {
   private reopen(): void {
     const turned = !this.stale();
     this.staging = new Map();
+    this.stagedCause = new Map();
+    this.stagedNG = null;
     if (turned) this.notify(this.listeners);
   }
 

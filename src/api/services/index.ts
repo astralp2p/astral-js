@@ -26,7 +26,7 @@ export {
   type Reach,
 } from './discover.js';
 export { advertise, Binding, type Offering, type OfferingHandler } from './advertise.js';
-export { watch, Watcher, type WatchOptions, type ReconnectOptions } from './watch.js';
+export { watch, Watcher, type Removal, type WatchOptions, type ReconnectOptions } from './watch.js';
 
 /**
  * A client for the node's `services` protocol, bound to a connected

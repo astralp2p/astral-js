@@ -14,6 +14,8 @@ export const Types = {
   change: 'services.change',
   incomplete: 'services.incomplete',
   removed: 'services.removed',
+  notGranted: 'services.not_granted',
+  taggedUpdate: 'services.tagged_update',
 } as const;
 
 /** Wire type tag of a `services.update` object. */

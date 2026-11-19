@@ -93,8 +93,8 @@ export class Binding {
  *
  * Resolves once the node acknowledges the binding. Rejects with
  * {@link RemoteError} when the node refuses it, for instance because this app
- * already holds one of the names. Re-advertising after a disconnect is left to
- * the app.
+ * already holds one of the names. The binding ends when the node ends it;
+ * {@link provide} advertises again whenever that happens.
  */
 export async function advertise(
   host: Host,

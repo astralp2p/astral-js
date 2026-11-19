@@ -523,3 +523,73 @@ describe('Services.advertise', () => {
     await expect(services.advertise({ player: () => null })).rejects.toBeInstanceOf(RemoteError);
   });
 });
+
+describe('Services.provide', () => {
+  const handlers = { player: () => ({ available: true }) };
+
+  it('advertises again within 1 s when the node ends the binding', async () => {
+    const first = follow(ack);
+    const { services, opened } = scriptedQueries(first, follow(ack));
+    const p = await services.provide(handlers);
+    const old = p.current();
+    expect(old).not.toBeNull();
+    expect(opened()).toBe(1);
+
+    const start = Date.now();
+    first.end();
+    await until(() => opened() === 2 && p.current() !== null && p.current() !== old, 1000);
+    expect(Date.now() - start).toBeLessThan(1000);
+
+    p.close();
+    await p.done;
+  });
+
+  it('backs off while advertising fails, and close stops it', async () => {
+    const first = follow(ack);
+    const { services, opened } = scriptedQueries(first);
+    const p = await services.provide(handlers, { retry: { minMs: 1, maxMs: 4 } });
+
+    first.end();
+    await until(() => opened() >= 3);
+    expect(p.current()).toBeNull();
+
+    p.close();
+    await p.done;
+    const n = opened();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(opened()).toBe(n);
+  });
+
+  it('close ends the binding and advertises nothing more', async () => {
+    const first = follow(ack);
+    const { services, opened } = scriptedQueries(first, follow(ack));
+    const p = await services.provide(handlers);
+
+    p.close();
+    await p.done;
+    expect(first.closed).toBe(true);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(opened()).toBe(1);
+  });
+
+  it('retries the refusal of a held name', async () => {
+    const { services, opened } = scriptedQueries(
+      follow({ type: 'error_message', value: 'service already advertised by this provider' }),
+      follow(ack),
+    );
+    const p = await services.provide(handlers);
+    expect(opened()).toBe(2);
+    expect(p.current()).not.toBeNull();
+    p.close();
+    await p.done;
+  });
+
+  it('rejects any other refusal at once', async () => {
+    const { services, opened } = scriptedQueries(
+      follow({ type: 'error_message', value: 'not permitted' }),
+      follow(ack),
+    );
+    await expect(services.provide(handlers)).rejects.toBeInstanceOf(RemoteError);
+    expect(opened()).toBe(1);
+  });
+});

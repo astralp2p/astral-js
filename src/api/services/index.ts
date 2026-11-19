@@ -5,6 +5,7 @@
 import type { Host } from '../../apphost/host.js';
 import { advertise, type Binding, type OfferingHandler } from './advertise.js';
 import { discover, type DiscoverOptions, type DiscoveryStream } from './discover.js';
+import { provide, type ProvideOptions, type Provider } from './provider.js';
 import { watch, type Watcher, type WatchOptions } from './watch.js';
 
 export { Ops, Types, UPDATE_TYPE, MAX_NAMES } from './consts.js';
@@ -26,6 +27,7 @@ export {
   type Reach,
 } from './discover.js';
 export { advertise, Binding, type Offering, type OfferingHandler } from './advertise.js';
+export { provide, Provider, type ProvideOptions } from './provider.js';
 export { watch, Watcher, type Removal, type WatchOptions, type ReconnectOptions } from './watch.js';
 
 /**
@@ -38,6 +40,8 @@ export { watch, Watcher, type Removal, type WatchOptions, type ReconnectOptions 
  *
  * // Provide: answer each caller's view of "player".
  * const binding = await services.advertise({ player: () => ({ available: true }) });
+ * // Or keep it advertised whenever the node ends the binding:
+ * const provider = await services.provide({ player: () => ({ available: true }) });
  *
  * // Consume: follow the players this app may discover.
  * const w = await services.watch(['player']);
@@ -54,6 +58,14 @@ export class Services {
   /** See {@link advertise}. */
   advertise(handlers: Readonly<Record<string, OfferingHandler>>): Promise<Binding> {
     return advertise(this.host, handlers);
+  }
+
+  /** See {@link provide}. */
+  provide(
+    handlers: Readonly<Record<string, OfferingHandler>>,
+    opts: ProvideOptions = {},
+  ): Promise<Provider> {
+    return provide(this.host, handlers, opts);
   }
 
   /** See {@link discover}. */

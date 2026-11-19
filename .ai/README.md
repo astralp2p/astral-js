@@ -23,7 +23,8 @@ same `Session` / `Transport` seam.
   `encodeObjectID` (an id ↔ its 8-byte size + 32-byte sha256 digest, mirroring
   astral-go's `ParseID`/`String`: both text forms decode, `data1` alone
   encodes); the error hierarchy +
-  `queryErrorForCode`; `buildQueryString` (255-byte cap). Exported at
+  `queryErrorForCode` + `isRetryable` (true for `QueryRejected` 6 or 7 and
+  for `Timeout`); `buildQueryString` (255-byte cap). Exported at
   `astral-js/astral` and re-exported from the root.
 - `src/apphost/` — the WebSocket client, a faithful port of the astrald
   apphost-js reference client onto the primitives. `connect(url,{token})` →

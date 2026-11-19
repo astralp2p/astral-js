@@ -10,6 +10,7 @@
  * @module astral/errors
  */
 
+import { CodeTimeout, CodeUnavailable } from './codes.js';
 import type { AstralObject } from './object.js';
 import { isError } from './object.js';
 
@@ -109,6 +110,21 @@ export function queryErrorForCode(code: string): AstralError {
     default:
       return new ProtocolError(`unknown error code: ${code}`);
   }
+}
+
+/**
+ * Whether a failed query may succeed if repeated: true for a
+ * {@link QueryRejected} with code 7 (unavailable) or 6 (timeout) and for a
+ * {@link Timeout}, false for every other error. A caller retries those with a
+ * bounded backoff, discovers the target again on {@link RouteNotFound}, and
+ * stops on any other error (astral-docs `core-definitions/query.md`, Routing
+ * outcomes).
+ */
+export function isRetryable(err: unknown): boolean {
+  if (err instanceof QueryRejected) {
+    return err.code === CodeUnavailable || err.code === CodeTimeout;
+  }
+  return err instanceof Timeout;
 }
 
 /** Read the message from a wire `error_message` object, or `undefined` otherwise. */

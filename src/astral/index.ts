@@ -74,6 +74,8 @@ export {
   CodeInvalidQuery,
   CodeCanceled,
   CodeInternalError,
+  CodeTimeout,
+  CodeUnavailable,
   DefaultRejectCode,
 } from './codes.js';
 
@@ -93,6 +95,7 @@ export {
   EncodingError,
   ErrorCodes,
   queryErrorForCode,
+  isRetryable,
   readErrorMessage,
 } from './errors.js';
 

@@ -108,8 +108,12 @@ same `Session` / `Transport` seam.
   `seed(phrase,{passphrase?})`, `deriveKey(seed,{path?})` (the three input ops
   stream one object + eos, read one reply).
 - **apphost** (ops, `astral-js/api/apphost` — distinct from the client lib) —
-  `register({name?, permits?, contractPermits?})→AccessTokenValue` (mint a
-  guest identity + token; streams one `mod.apphost.register_request`),
+  `register({name?, permits?, contractPermits?, vfs?, evaluator?})→AccessTokenValue`
+  (mint a guest identity + token; streams one `mod.apphost.register_request`;
+  `vfs`/`evaluator` are sent as `Vfs`/`Evaluator` only when given, absent
+  means `true`: the node creates the app's VFS and names the app its
+  evaluator at `<app>:vfs.authorize`; an app that does not serve that op
+  passes `evaluator: false`),
   `grant(identity, permits, {durationMs?})` (streams one
   `mod.apphost.grant_request`, reads `ack`),
   `requestGrant(permits, {durationMs?})` (streams one

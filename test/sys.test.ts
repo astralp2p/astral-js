@@ -83,6 +83,20 @@ describe('Sys.registerManager', () => {
     ]);
   });
 
+  it('sends no Vfs or Evaluator, which a register_manager_request lacks', async () => {
+    const { transport, streamed } = recordingTransport([TOKEN_REPLY]);
+    const opts = { vfs: false, evaluator: false } as apphost.RegisterOptions;
+
+    await sysOn(transport).registerManager(opts);
+
+    expect(Object.keys(streamed[0]!.value as object).sort()).toEqual([
+      'ContractPermits',
+      'GrantPermits',
+      'Name',
+      'Policies',
+    ]);
+  });
+
   it('names the five policies', () => {
     expect(Object.values(Policies)).toEqual([
       'app_register',

@@ -137,6 +137,7 @@ const apphost = new Apphost(host);
 const { Token, Identity } = await apphost.register({
   name: 'My App',
   permits: ['mod.auth.see_objects_action'],
+  evaluator: false, // this app does not serve vfs.authorize
 });
 const app = new Apphost(await connect(url, { token: Token }));
 await app.requestGrant([discoveryPermit(['inference'])], { durationMs: 3600000 });

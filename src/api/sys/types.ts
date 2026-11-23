@@ -23,9 +23,13 @@ export interface PolicyBindingValue {
  * The input of `sys.register_manager`: the JSON `value` of a
  * `mod.sys.register_manager_request`. `Name`, `GrantPermits` and
  * `ContractPermits` mean what they mean in a `mod.apphost.register_request`
- * ({@link RegisterRequestValue}).
+ * ({@link RegisterRequestValue}); it has no `Vfs` or `Evaluator`, and the node
+ * refuses a JSON object that carries a field the type lacks.
  */
-export interface RegisterManagerRequestValue extends RegisterRequestValue {
+export interface RegisterManagerRequestValue extends Omit<
+  RegisterRequestValue,
+  'Vfs' | 'Evaluator'
+> {
   /** The policies the manager decides, one binding each. */
   Policies: PolicyBindingValue[];
 }

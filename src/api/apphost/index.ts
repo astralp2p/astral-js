@@ -83,6 +83,21 @@ export interface RegisterOptions {
    * verifies, and cannot be revoked.
    */
   contractPermits?: PermitInput[];
+  /**
+   * Whether the node creates the VFS of the new identity, sent as `Vfs`.
+   * Absent: not sent, and the node creates it. `false` registers the app
+   * without a VFS; {@link RegisterOptions.evaluator} then has no effect.
+   */
+  vfs?: boolean;
+  /**
+   * Whether the node names the app the evaluator of its own VFS, at
+   * `astral://<app identity>:vfs.authorize`, sent as `Evaluator`. Absent: not
+   * sent, and the node names the app. An app that does not serve
+   * `vfs.authorize` passes `false`, which leaves the evaluator empty;
+   * otherwise every VFS read or write the built-in rules refuse waits for the
+   * question to time out.
+   */
+  evaluator?: boolean;
 }
 
 /** The lifetime option of {@link Apphost.grant} and {@link Apphost.requestGrant}. */
@@ -108,6 +123,7 @@ export type RevokeTarget = { id: number; action?: never } | { action: string; id
  * const { Token, Identity } = await apphost.register({
  *   name: 'My App',
  *   permits: ['mod.auth.see_objects_action'],
+ *   evaluator: false, // this app does not serve vfs.authorize
  * });
  *
  * // reconnect with the token, then ask for a scoped grant:
@@ -130,7 +146,9 @@ export class Apphost {
    * `mod.apphost.register_request` carrying {@link RegisterOptions.name},
    * {@link RegisterOptions.permits} (as `GrantPermits`) and
    * {@link RegisterOptions.contractPermits} (as `ContractPermits`), also for a
-   * bare `register()`, because the op reads one object. The node generates a
+   * bare `register()`, because the op reads one object; it carries `Vfs` and
+   * `Evaluator` only when {@link RegisterOptions.vfs} and
+   * {@link RegisterOptions.evaluator} are given. The node generates a
    * new keypair, signs and stores an app contract between the new identity and
    * the node, and issues an access token — returned as the `value` of a single
    * `apphost.access_token` object, shaped like {@link AccessTokenValue}. Grants
@@ -138,6 +156,12 @@ export class Apphost {
    * written. A stored delegate decides first; without one, the node's
    * configured `app_register` policy decides, and its default `reject_all`
    * declines every registration.
+   *
+   * Unless `vfs` is `false`, the node also creates the VFS of the new identity
+   * and, unless `evaluator` is `false`, names the app its evaluator at
+   * `astral://<app identity>:vfs.authorize`. The register policy does not see
+   * either field. An app that does not serve `vfs.authorize` passes
+   * `evaluator: false`.
    *
    * REFUSAL PATHS. A policy refusal arrives after accept as a
    * {@link RemoteError} "registration declined". A query from a network origin
@@ -147,11 +171,13 @@ export class Apphost {
    * op: by default on a `fresh` node, which appoints a manager first with
    * `sys.register_manager` (`Sys.registerManager` at `astral-js/api/sys`).
    * Any other failure past accept (key generation, contract signing, token
-   * minting) streams an `error_message`, a {@link RemoteError}.
+   * minting, creating the VFS or naming its evaluator) streams an
+   * `error_message`, a {@link RemoteError}.
    *
    * @param opts Optional {@link RegisterOptions}.
    * @returns The minted {@link AccessTokenValue} (`Identity`, `Token`, `ExpiresAt`).
-   * @throws {TypeError} If a permit is malformed; nothing is routed then.
+   * @throws {TypeError} If a permit is malformed, or `vfs` or `evaluator` is
+   *   given and is not a boolean; nothing is routed then.
    */
   async register(opts: RegisterOptions = {}): Promise<AccessTokenValue> {
     const request = obj(Types.registerRequest, registerFields(opts));
@@ -329,13 +355,26 @@ export class Apphost {
   }
 }
 
-/** The `mod.apphost.register_request` fields of `opts`, permits checked. */
+/**
+ * The `mod.apphost.register_request` fields of `opts`, permits checked. An
+ * absent `vfs` or `evaluator` leaves its field out, which the node reads as
+ * `true`.
+ */
 function registerFields(opts: RegisterOptions): RegisterRequestValue {
-  return {
+  const value: RegisterRequestValue = {
     Name: opts.name ?? '',
     GrantPermits: (opts.permits ?? []).map(toPermit),
     ContractPermits: (opts.contractPermits ?? []).map(toPermit),
   };
+  if (opts.vfs !== undefined) value.Vfs = checkBool('vfs', opts.vfs);
+  if (opts.evaluator !== undefined) value.Evaluator = checkBool('evaluator', opts.evaluator);
+  return value;
+}
+
+/** Return `v`, the register option called `name`, checked to be a boolean. */
+function checkBool(name: string, v: unknown): boolean {
+  if (typeof v !== 'boolean') throw new TypeError(`${name} is not a boolean: ${String(v)}`);
+  return v;
 }
 
 /** Check a non-empty permit list. */

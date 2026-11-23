@@ -50,9 +50,11 @@ export interface PolicyBinding {
 
 /**
  * Options for {@link Sys.registerManager}. `name`, `permits` and
- * `contractPermits` mean what they mean for `Apphost.register`.
+ * `contractPermits` mean what they mean for `Apphost.register`. A
+ * `mod.sys.register_manager_request` has no `Vfs` or `Evaluator`: the node
+ * creates no VFS for the manager.
  */
-export interface RegisterManagerOptions extends RegisterOptions {
+export interface RegisterManagerOptions extends Omit<RegisterOptions, 'vfs' | 'evaluator'> {
   /**
    * The policies the manager decides, sent as `Policies`. The node stores a
    * delegate for each, with the new identity as delegate identity, and clears

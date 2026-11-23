@@ -40,6 +40,17 @@ export interface RegisterRequestValue {
   GrantPermits: PermitValue[];
   /** The permits the app asks to hold in a signed node→app contract. */
   ContractPermits: PermitValue[];
+  /**
+   * `true` asks the node to create the VFS of the new identity, `false`
+   * registers the app without one. Absent or `null` means `true`.
+   */
+  Vfs?: boolean | null;
+  /**
+   * `true` names the app the evaluator of its own VFS, at
+   * `astral://<app identity>:vfs.authorize`; `false` leaves the evaluator
+   * empty. Absent or `null` means `true`. Without a VFS it has no effect.
+   */
+  Evaluator?: boolean | null;
 }
 
 /** The input of `apphost.grant`: the JSON `value` of a `mod.apphost.grant_request`. */

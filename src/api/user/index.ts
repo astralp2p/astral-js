@@ -36,9 +36,8 @@
  * (`mod/user/src/op_{info,adopt,swarm_status,derive_identity,bootstrap,join}.go`),
  * and the Go client (`api/user/client/{derive_identity,bootstrap,join}.go`,
  * `api/user/{derive_identity_result,bootstrap_result}.go`). The
- * remaining `user.*` op strings (`user.assets`, `user.request_membership`,
- * `user.list_siblings`, `user.list_expelled`, `user.sync_with`,
- * `user.sync_assets`, `user.add_asset`, `user.remove_asset`) are
+ * remaining `user.*` op strings (`user.request_membership`,
+ * `user.list_siblings`, `user.list_expelled`) are
  * server/handler-side or lack a client method in the reference SDK, and are
  * intentionally omitted.
  *

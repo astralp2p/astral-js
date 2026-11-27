@@ -41,15 +41,24 @@ import { RemoteError, ProtocolError, readErrorMessage } from '../../astral/error
 
 export { PERMIT_TYPE, permit, toPermit } from './types.js';
 export type { BundleValue, PermitInput, PermitValue } from './types.js';
+export {
+  CONTRACT_TYPE,
+  MAX_CONTRACT_TEXT_LEN,
+  MAX_PERMIT_WORD_LEN,
+  contractSignableText,
+} from './contract.js';
+export type { ContractTextInput, ContractValue } from './contract.js';
 
 /**
  * The unsigned body of an authorization grant, sent to {@link Auth.signContract}.
  *
  * Structurally an {@link AstralObject}: `type` is `'mod.auth.contract'` and
  * `value` is the JSON object the Go `auth.Contract` marshals to — `Issuer` /
- * `Subject` (identity envelopes), `Permits` (a list of flat
- * {@link PermitValue} objects), and `ExpiresAt` (a time envelope). The caller
- * builds and reads `value` directly (Go `api/auth/contract.go`).
+ * `Subject` (identity strings), `Permits` (a list of flat {@link PermitValue}
+ * objects), `ExpiresAt` (an RFC 3339 string) and `RequestID` (the stored signed
+ * request the contract answers, or `null`). The caller builds and reads `value`
+ * directly as a {@link ContractValue} (Go `api/auth/contract.go`);
+ * {@link contractSignableText} gives the line a text signer signs for it.
  */
 export type Contract = AstralObject;
 
@@ -75,7 +84,7 @@ export type SignedContract = AstralObject;
  * // Ask the node to sign an unsigned contract; get the signed form back.
  * const signed = await auth.signContract({
  *   type: 'mod.auth.contract',
- *   value: { Issuer, Subject, Permits, ExpiresAt },
+ *   value: { Issuer, Subject, Permits, ExpiresAt, RequestID: null },
  * });
  * ```
  */

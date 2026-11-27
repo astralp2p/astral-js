@@ -71,8 +71,9 @@ export type { NodeState } from './consts.js';
 /**
  * An unsigned authorization contract (`mod.auth.contract`) as a pass-through
  * {@link AstralObject}. Its `value` carries the Go `Contract`'s JSON shape
- * (`Issuer` / `Subject` / `Permits` / `ExpiresAt`); the nested `Permit` /
- * `Bundle` fields are intentionally left untyped.
+ * (`Issuer` / `Subject` / `Permits` / `ExpiresAt` / `RequestID`, typed as
+ * `ContractValue` in `astral-js/api/auth`); the nested `Permit` / `Bundle`
+ * fields are intentionally left untyped.
  */
 export type Contract = AstralObject;
 

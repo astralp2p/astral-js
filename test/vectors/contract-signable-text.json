@@ -1,0 +1,739 @@
+{
+  "source": "astral-go cff1c5d (main; api/auth is identical at the astrald pin 45194bf3): Contract.MarshalJSON, SignableText, SignableHash and ResolveObjectID, with api/user imported so the tier actions are registered. Signing keys are the secp256k1 private keys 1, 2 and 3.",
+  "vectors": [
+    {
+      "name": "membership_member_with_request_id",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.user.member_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": "data1npfk7miqi4zk7miqi4zk7miqi4zk7miqi4zk7miqi4zk7miqi4zk7m",
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 member depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "8e752fd32b7915d4c4086f1b5268a73b7f14c86ce532ebc2a7af9aa2692f3e66",
+      "objectId": "data1kuduif9j1s6ei4unyo5a5kjwkqq59nurg33j17xbkxmh4wjw16xug"
+    },
+    {
+      "name": "membership_trusted_no_request_id",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.user.trusted_action",
+            "Constraints": null,
+            "Delegation": 1
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 trusted depth 1 until 2030-01-02 03:04:05",
+      "signableHash": "c9d8abbc44b86db86e79367a6b83471c1562e624817406da11dbb83bbcc1c3e0",
+      "objectId": "data1ef1qaiq6rjqdpzbz81pu4pqbwq8yicmunjymwy5pbds7a8q6cdo9y"
+    },
+    {
+      "name": "membership_privileged",
+      "value": {
+        "ExpiresAt": "2031-12-31T23:59:59Z",
+        "Issuer": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "Permits": [
+          {
+            "Action": "mod.user.privileged_member_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": "data1npfk7miqi4zk7miqi4zk7miqi4zk7miqi4zk7miqi4zk7miqi4zk7m",
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 privileged_member depth 0 until 2031-12-31 23:59:59",
+      "signableHash": "884ee725fbfd6eacc10e655986191de5093ac665ce6ec53d2477389e4858d86b",
+      "objectId": "data1mjnnqhh19z9mqiuyoh3k3oact53ej8mdgmuuqaw61e73au3rftsdm"
+    },
+    {
+      "name": "named_actions_largest_depth",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.auth.sudo_action",
+            "Constraints": null,
+            "Delegation": 7
+          },
+          {
+            "Action": "mod.auth.see_objects_action",
+            "Constraints": null,
+            "Delegation": 2
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 auth.sudo,auth.see_objects depth 7 until 2030-01-02 03:04:05",
+      "signableHash": "098f6d0dd9e48f644d315ced55fa805f03d8280b6d1540b9d965ed1a219624fa",
+      "objectId": "data1jhncxpwg7u3rxctgunz8pkz7eyzad5ywys5eienh713xpdeo3cj84"
+    },
+    {
+      "name": "distinct_actions_nil_permit",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.vfs.read_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.vfs.read_action",
+            "Constraints": null,
+            "Delegation": 1
+          },
+          null
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 vfs.read depth 1 until 2030-01-02 03:04:05",
+      "signableHash": "df038bbf12d6884300f0367515ad56f75a959f79984cad79cd27139c68651ac5",
+      "objectId": "data1jpzadtq9tfiweecyxypuinssip7441sxzugnciihh4jauutwgkgsf"
+    },
+    {
+      "name": "unnamed_actions_counted",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.vfs.read_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "test.action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.Auth.sudo_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 vfs.read,+2 depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "ed7fd71449e9ebffd9822c29cd11a7bb64d6ddee2b514242c4c4ef5295543844",
+      "objectId": "data1km5m94hkru4xm99carmbj3we4xq5r45q6hk4tejbcjt8xkkkieqnr"
+    },
+    {
+      "name": "only_unnamed_depth_255",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "test.action",
+            "Constraints": null,
+            "Delegation": 255
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 +1 depth 255 until 2030-01-02 03:04:05",
+      "signableHash": "5511e60b91e9c204e6f7f9f8c5a8abc19dec1eb1816627ec0907fc1962f4f843",
+      "objectId": "data18ciethaf3d4qnyuuxx6xaaswkzoc77oxmdymgr9sy1b9hdftxj6nd"
+    },
+    {
+      "name": "no_permits",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 none depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "c46da23fd84ba9db3430f48e49573526bb548af3a6ad6bde1d2b92c9f9a078c0",
+      "objectId": "data1gxtdpwe97o17j5c4db7rqjfmukji5k1fx8jippxxb4kh138h4y6gy"
+    },
+    {
+      "name": "overflow_50_actions",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.module00.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module01.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module02.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module03.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module04.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module05.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module06.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module07.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module08.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module09.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module10.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module11.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module12.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module13.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module14.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module15.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module16.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module17.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module18.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module19.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module20.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module21.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module22.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module23.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module24.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module25.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module26.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module27.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module28.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module29.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module30.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module31.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module32.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module33.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module34.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module35.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module36.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module37.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module38.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module39.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module40.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module41.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module42.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module43.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module44.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module45.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module46.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module47.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module48.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.module49.long_action_name_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 module00.long_action_name,+49 depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "09b90ce3ddc3edfbeeec540f10f11488b6d9383b10089ba2953e2d1b02753fb9",
+      "objectId": "data1rdqnp3but75o9p9xzqaiyxndatjnfs5rhdsryeuqtjkxtpdcb8kx73"
+    },
+    {
+      "name": "fractional_seconds_truncate",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05.987654321Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.user.member_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 member depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "18579c08f54707b6f504cc33bc44595232855dd6fd826280b3a9d8f2bcd78c29",
+      "objectId": "data1engnzuorxkta8s54ojubuztnf1wt1oiq7p9cnckym8kqa6k6pxdbj"
+    },
+    {
+      "name": "offset_input_normalised_to_utc",
+      "value": {
+        "ExpiresAt": "2030-01-02T01:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.user.member_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 member depth 0 until 2030-01-02 01:04:05",
+      "signableHash": "1e5b3307a84776ae8338d42cdd28762926b2efb599a41b191c26b01c8d4aaaac",
+      "objectId": "data1en815gcd4ot5si4butibc5ww8ckjgsmz5mgprdcctajiod1gwikic"
+    },
+    {
+      "name": "zero_time",
+      "value": {
+        "ExpiresAt": "0001-01-01T00:00:00Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.user.member_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 member depth 0 until 0001-01-01 00:00:00",
+      "signableHash": "cc1580aad584194120b4acad7222f1c5afc511bd5f08d290a4a7ae9f25a0da8e",
+      "objectId": "data1eduyionipmby3eromjmfpqetxdtpxawe54zae4kekjj7quh14bswq"
+    },
+    {
+      "name": "nil_identities",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": null,
+        "Permits": [
+          {
+            "Action": "mod.user.member_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": null
+      },
+      "signableText": "000000000000000000000000000000000000000000000000000000000000000000 grants 000000000000000000000000000000000000000000000000000000000000000000 member depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "51b4e2d6a8da97c05e034aeeccb52167aafb19b7eed24b8e470fee1861277d6b",
+      "objectId": "data1d6wpwhmmktswzabxyg1zq3141n37k9cc5x5s1jq8rqd9qdbo1q9mm"
+    },
+    {
+      "name": "anyone_subject_zero_request_id",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.user.member_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": "data1",
+        "Subject": "anyone"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 000000000000000000000000000000000000000000000000000000000000000000 member depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "9f2d5f7bf7c17698e0300d0a07a4c7bb77ef84daafa10d360b63fe0e596456bd",
+      "objectId": "data1ku83pm779xomsudodydeky61cxq5z76npim7bbw5ysa96b3cseii7"
+    },
+    {
+      "name": "edge_single_word_fills_line_exactly",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.m.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 m.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "6fad23ba375ed3eddadf2604d2bd16811b1b39f4ccdc411d84fad24c97797351",
+      "objectId": "data1ky57prq7dqzsu7zpp6jor4k6tpye5dch9jugherqaj6s1j1mz1h4t"
+    },
+    {
+      "name": "edge_single_word_one_over",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.m.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 +1 depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "d4635abbf24b35545f143c64d7c3a1c6dbbe2c28584d35ce7c2f7b3eca8b3f9f",
+      "objectId": "data1kdiddmk79r13iktxtexdr49b4dts5zasnosnpgz88am5585fesxh9"
+    },
+    {
+      "name": "edge_pair_fills_line_exactly",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.m.aaaaaaaaaaaaaaaaaa_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.bbbbbbbbbbbbbbbbbbb_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 m.aaaaaaaaaaaaaaaaaa,m.bbbbbbbbbbbbbbbbbbb depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "b75d2afcd36a9d09e895a0a958aa621269fe4c91efbd0f95090696959d623c34",
+      "objectId": "data1k7p47fm6pg4w7b8wjmefjmnigrruj93gjd577b6ko1bws1sqsrxbw"
+    },
+    {
+      "name": "edge_pair_second_one_over",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.m.aaaaaaaaaaaaaaaaaa_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.bbbbbbbbbbbbbbbbbbbb_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 m.aaaaaaaaaaaaaaaaaa,+1 depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "cf1e9a152f5a12a2c46bc563282502f689ba10582413410614f43a6ff4d4f778",
+      "objectId": "data1k9ua6uek16so1wmngztmdfy1of7wjzeefojyuerdbj7b4p94pj75a"
+    },
+    {
+      "name": "edge_first_leaves_room_for_count",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.m.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.bbb_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 m.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,+1 depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "c7bfd5fcb4082a2d4dd89dd1851899fc6dcbd8e8d449ee2077f8fef31171e153",
+      "objectId": "data1mdt794z6menbkfig7t8qtowcju9dp3xcqtinj7ao8x6866cezdaku"
+    },
+    {
+      "name": "edge_first_leaves_no_room_for_count",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.m.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.bbb_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 +2 depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "0a3f204f6e5f926091e09a28c42cd7302d33ba344513705755acaae56bff1fb4",
+      "objectId": "data1mrnt9rb8shzh1cne6bgteaospqcbpgq7deteuqbmimmfkhii9687w"
+    },
+    {
+      "name": "edge_count_grows_a_digit",
+      "value": {
+        "ExpiresAt": "2030-01-02T03:04:05Z",
+        "Issuer": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "Permits": [
+          {
+            "Action": "mod.m.aaaaaaaaaaaaaaaaaa_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w00_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w01_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w02_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w03_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w04_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w05_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w06_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w07_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w08_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w09_action",
+            "Constraints": null,
+            "Delegation": 0
+          },
+          {
+            "Action": "mod.m.w10_action",
+            "Constraints": null,
+            "Delegation": 0
+          }
+        ],
+        "RequestID": null,
+        "Subject": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "signableText": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798 grants 02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5 m.aaaaaaaaaaaaaaaaaa,m.w00,m.w01,m.w02,+8 depth 0 until 2030-01-02 03:04:05",
+      "signableHash": "d817c451d2d89ab2c03bad421798e9066bd6313539eda0955750161a7861a5f8",
+      "objectId": "data1spsyzate7fsr4smydzmknn6cq1bum4aaukqxpwnkiqwysdjhgdjxa"
+    }
+  ]
+}
